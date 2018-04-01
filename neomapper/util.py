@@ -1,4 +1,11 @@
+import re
 
+
+__normal = re.compile('[\W_]+')
+
+
+def normalize(string):
+    return __normal.sub('', string.lower())
 
 
 def entity_to_labels(entity):

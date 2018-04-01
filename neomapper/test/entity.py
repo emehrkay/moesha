@@ -28,6 +28,30 @@ class EntityTests(unittest.TestCase):
 
         self.assertIsInstance(n, Node)
 
+    def test_can_create_entity_and_remove_pre_defined_attributes(self):
+        class X(Node):
+            id = Integer()
+            age = Integer()
+
+        id = 999
+        age = 888
+        p = {'id': id, 'age': age}
+        x = X(properties=p)
+        id2 = 999
+        age2 = 888
+        p2 = {'id': id2, 'age': age2}
+        y = X(properties=p2)
+
+        self.assertEqual(x.id, None)
+        self.assertEqual(x.age, None)
+        self.assertEqual(x['id'], id)
+        self.assertEqual(x['age'], age)
+
+        self.assertEqual(y.id, None)
+        self.assertEqual(y.age, None)
+        self.assertEqual(y['id'], id2)
+        self.assertEqual(y['age'], age2)
+
     def test_can_create_entities_with_labels(self):
         t = TestNode()
         tl = TesLabeldtNode()

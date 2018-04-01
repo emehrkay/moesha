@@ -1,11 +1,27 @@
 import copy
 
+from six import with_metaclass
+
 from .property import (PropertyManager, Property)
 from .util import (normalize_labels, entity_name, entity_to_labels)
 
 
 
 ENTITY_MAP = {}
+
+
+def get_entity(label=None):
+    label = label or []
+
+    if not isinstance(label, (list, set, tuple)):
+        label = [label,]
+
+    label = normalize_labels(*label)
+
+    if label in ENTITY_MAP:
+        return ENTITY_MAP[label]
+
+    return Node
 
 
 class _Entity(type):
@@ -52,6 +68,9 @@ class _Entity(type):
             self.properties = PropertyManager(properties=props,
                 allow_undefined=glob['allow_undefined'], data_type=data_type)
 
+            for prop in props:
+                setattr(self, prop, None)
+
 
         if glob['labels']:
             if not isinstance(glob['labels'], (list, tuple, set)):
@@ -61,14 +80,14 @@ class _Entity(type):
         else:
             labels = entity_to_labels(cls)
 
-        ENTITY_MAP[labels] = entity_name(cls)
         cls = super(_Entity, cls).__new__(cls, name, bases, attrs)
+        ENTITY_MAP[labels] = cls
         setattr(cls, '_build_properties', build_properties)
 
         return cls
 
 
-class Entity(metaclass=_Entity):
+class Entity(with_metaclass(_Entity)):
     _LABELS = None
 
     def __init__(self, data_type='python', labels=None, id=None,
@@ -79,6 +98,7 @@ class Entity(metaclass=_Entity):
         self.label = labels or self._LABELS
         self._id = None
         self.id = id
+        self.query_variable = None
         properties = properties or {}
 
         self.force_hydrate(**properties)
@@ -160,6 +180,63 @@ class StructuredNode(Node):
 class Relationship(Entity):
     _ALLOW_UNDEFINED = True
 
+    def __init__(self, data_type='python', labels=None, id=None, start=None,
+                 end=None, properties=None):
+        super(Relationship, self).__init__(data_type=data_type, labels=labels,
+            id=id, properties=properties)
+        self.start = start
+        self.end = end
+
+    def _get_labels(self):
+        labels = super(Relationship, self)._get_labels()
+
+        return labels[0]
+
+    def _set_labels(self, label):
+        return super(Relationship, self)._set_labels(label)
+
+    label = property(_get_labels, _set_labels)
+    type = property(_get_labels, _set_labels)
+
 
 class StructuredRelationship(Relationship):
     _ALLOW_UNDEFINED = False
+
+
+class Collection(object):
+
+    def __init__(self, entities=None):
+        if not isinstance(entities, (list, set, tuple)):
+            entities = [entities,]
+        elif isinstance(entities, Collection):
+            entities = entities.entities
+
+        self.entities = entities or []
+        self.index = 0
+
+    def __getitem__(self, field):
+        return [entity[field] for entity in self]
+
+    def __setitem__(self, field, value):
+        for entity in self:
+            entity[field] = value
+
+        return self
+
+    def __delitem__(self, field):
+        for entity in self:
+            del(entity[field])
+
+        return self
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            entity = self.entities[self.index]
+            self.index += 1
+
+            return entity
+        except Exception as e:
+            raise StopIteration()

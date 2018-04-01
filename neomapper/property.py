@@ -5,7 +5,7 @@ from collections import OrderedDict
 from datetime import datetime
 
 
-class PropertyManager:
+class PropertyManager(object):
 
     def __init__(self, properties=None, data_type='python',
                  allow_undefined=False):
@@ -106,7 +106,7 @@ class PropertyManager:
         return self
 
 
-class Property:
+class Property(object):
     default = None
 
     def __init__(self, value=None, data_type='python', default=None,
