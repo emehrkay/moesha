@@ -210,6 +210,30 @@ class EntityTests(unittest.TestCase):
         self.assertEqual(1, len(t.data))
         self.assertNotEqual(p['time'], t['time'])
 
+    def test_can_get_changed_properties(self):
+        p = {
+            'name': 'some name',
+            'location': 'some location'
+        }
+        n = Node(properties=p)
+        n['name'] = 'some new name'
+        changed = n.changed
+
+        self.assertEqual(1, len(changed))
+        self.assertIn('name', changed)
+
+    def test_can_get_no_changed_properties(self):
+        p = {
+            'name': 'some name',
+            'location': 'some location'
+        }
+        n = Node(properties=p)
+        n['name'] = 'some new name'
+        n['name'] = p['name']
+        changed = n.changed
+
+        self.assertEqual(0, len(changed))
+
 
 if __name__ == '__main__':
     unittest.main()

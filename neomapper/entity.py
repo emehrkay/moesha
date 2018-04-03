@@ -168,6 +168,10 @@ class Entity(with_metaclass(_Entity)):
     def data(self):
         return self.properties.data
 
+    @property
+    def changed(self):
+        return self.properties.changed
+
 
 class Node(Entity):
     _ALLOW_UNDEFINED = True
