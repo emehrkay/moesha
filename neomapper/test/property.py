@@ -71,6 +71,22 @@ class PropertyTests(unittest.TestCase):
 
         self.assertEqual(i, f.value)
 
+    def test_can_tell_if_property_has_changed(self):
+        v = 'orig{}'.format(random())
+        v2 = 'updated{}'.format(random())
+        f = Property(value=v)
+        f.value = v2
+
+        self.assertTrue(f.changed)
+
+    def test_can_tell_if_property_has_not_changed(self):
+        v = 'orig{}'.format(random())
+        v2 = 'updated{}'.format(random())
+        f = Property(value=v)
+        f.value = v
+
+        self.assertFalse(f.changed)
+
 
 class StringTests(unittest.TestCase):
 
@@ -452,6 +468,42 @@ class PropertyManagerTests(unittest.TestCase):
         p.force_hydrate(t=v)
 
         self.assertEqual(v, p['t'])
+
+    def test_can_get_a_list_of_changed_properties(self):
+        p = {
+            'name': String(),
+            'age': Integer(),
+            'location': String()
+        }
+        new_name = 'name {}'.format(random())
+        new_location = 'location {}'.format(random())
+        p = PropertyManager(properties=p)
+        p['name'] = new_name
+        p['location'] = new_location
+        changed = p.changed
+
+        self.assertEqual(2, len(changed))
+        self.assertIn('name', changed)
+        self.assertIn('location', changed)
+
+    def test_can_show_no_changes_after_hydration(self):
+        p = {
+            'name': String(),
+            'age': Integer(),
+            'location': String()
+        }
+        new_name = 'name {}'.format(random())
+        new_location = 'location {}'.format(random())
+        p = PropertyManager(properties=p)
+        p['name'] = new_name
+        p['location'] = new_location
+        p.hydrate(**{
+            'name': 'some name',
+            'location': 'some location'
+        })
+        changed = p.changed
+
+        self.assertEqual(0, len(changed))
 
 
 if __name__ == '__main__':

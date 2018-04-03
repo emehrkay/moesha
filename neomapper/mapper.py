@@ -70,10 +70,11 @@ EQV = EntityQueryVariable
 
 class _Unit(object):
 
-    def __init__(self, entity, action, mapper):
+    def __init__(self, entity, action, mapper, **kwargs):
         self.entity = entity
         self.action = action
         self.mapper = mapper
+        self.kwargs = kwargs
 
 
 class _RootMapper(type):
@@ -190,8 +191,13 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
-    def delete(self, entity):
-        pass
+    def delete(self, entity, detach=True):
+        unit = _Unit(entity=entity, action='_delete_entity', mapper=self,
+            detach=detach)
+
+        self.mapper.add_unit(unit)
+
+        return self
 
     def _create_node(self, entity):
         query = Query(entities=[entity,], params=self.mapper.params)
@@ -208,10 +214,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save()
 
-    def _delete_node(self, entity):
+    def _delete_entity(self, entity, detach=True):
         query = Query(entities=[entity,], params=self.mapper.params)
 
-        return query.save()
+        return query.delete(detach=detach)
 
     def _update_relationship(self, entity):
         query = Query(entities=[entity,], params=self.mapper.params)
@@ -267,7 +273,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 class Mapper(object):
     PARAM_PREFIX = '$NM'
 
-    def __init__(self, connection):
+    def __init__(self, connection=None):
         self.connection = connection
         self.params = Params(self.PARAM_PREFIX)
         self.units = []
@@ -294,10 +300,10 @@ class Mapper(object):
 
         return mapper.save(entity)
 
-    def delete(self, entity):
+    def delete(self, entity, detach=True):
         mapper = self.get_mapper(entity=entity)
 
-        return mapper.delete(entity)
+        return mapper.delete(entity, detach=detach)
 
     def create(self, entity=None, properties=None, label=None):
         mapper = self.get_mapper(entity=entity)
@@ -309,7 +315,10 @@ class Mapper(object):
         params = {}
 
         for unit in self.units:
-            query, param = getattr(unit.mapper, unit.action)(unit.entity)
+            kwargs = unit.kwargs
+            kwargs['entity'] = unit.entity
+            query, param = getattr(unit.mapper, unit.action)(**kwargs)
+
             queries.append(query)
             params.update(param)
 
@@ -355,7 +364,6 @@ class Related(object):
 
     def query(self):
         return self.pypher
-
 
     def next(self):
         return self

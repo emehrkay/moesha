@@ -84,8 +84,15 @@ class PropertyManager(object):
         return None
 
     def hydrate(self, **properties):
+        """Call model.hydrate to ensure that there will be no changes
+        registered on the model's properties"""
         for field, value in properties.items():
             self.__setitem__(field, value)
+
+            prop = self.properties.get(field, None)
+
+            if prop:
+                prop.changed = False
 
         return self
 
@@ -105,6 +112,19 @@ class PropertyManager(object):
 
         return self
 
+    @property
+    def changed(self):
+        changed = {}
+
+        for name, prop in self.properties.items():
+            if prop.changed:
+                changed[name] = {
+                    'from': prop.original_value,
+                    'to': prop.value,
+                }
+
+        return OrderedDict(sorted(changed.items()))
+
 
 class Property(object):
     default = None
@@ -113,10 +133,12 @@ class Property(object):
                  immutable=False):
         self.immutable = False
         self._value = value
+        self.original_value = value
         self._data_type = data_type
         self.data_type = data_type
         self.default = default or self.default
         self.immutable = immutable
+        self.changed = False
 
     def _set_data_type(self, data_type):
         self._data_type = data_type
@@ -147,6 +169,7 @@ class Property(object):
         if self.immutable:
             return
 
+        self.changed = self.original_value != value
         self._value = value
 
     value = property(_get_value, _set_value)

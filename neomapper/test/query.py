@@ -89,7 +89,7 @@ class NodeQueryTests(unittest.TestCase):
         query, params = q.delete(detach=True)
         exp = "MATCH ({var}) WHERE id({var}) = ${id} DETACH DELETE {var}".format(
             var=n.query_variable, id=get_dict_key(params, _id))
-
+        print(exp)
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
