@@ -45,7 +45,13 @@ class _Entity(type):
 
             for n, v in source.items():
                 if isinstance(v, Property):
-                    properties[n] = v
+                    if v.name:
+                        name = v.name
+                        v.name = n
+                    else:
+                        name = n
+
+                    properties[name] = v
 
 
         def walk(bases):
@@ -68,8 +74,10 @@ class _Entity(type):
             self.properties = PropertyManager(properties=props,
                 allow_undefined=glob['allow_undefined'], data_type=data_type)
 
-            for prop in props:
-                setattr(self, prop, None)
+            """TODO: determine if we want the entity to retain the class
+            attribute or to nullify it"""
+            for name, prop in props.items():
+                setattr(self, name, None)
 
 
         if glob['labels']:

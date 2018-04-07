@@ -76,7 +76,7 @@ class PropertyManager(object):
             elif isinstance(value, datetime):
                 obj = DateTime
 
-            prop = obj(value=value, data_type=self.data_type)
+            prop = obj(value=value, data_type=self.data_type, name=field)
 
             if prop not in self.properties:
                 self.properties[field] = prop
@@ -130,8 +130,9 @@ class Property(object):
     default = None
 
     def __init__(self, value=None, data_type='python', default=None,
-                 immutable=False):
+                 immutable=False, name=None):
         self.immutable = False
+        self.name = name
         self._value = value
         self.original_value = value
         self._data_type = data_type

@@ -52,6 +52,19 @@ class EntityTests(unittest.TestCase):
         self.assertEqual(y['id'], id2)
         self.assertEqual(y['age'], age2)
 
+    def test_can_create_entity_with_renamed_property(self):
+        name = '!!!! some name that cannot be a property'
+        default = 'xxxx'
+
+        class Y(Node):
+            zzz = String(name=name, default=default)
+
+        y = Y()
+        data = y.data
+
+        self.assertEqual(1, len(data))
+        self.assertIn(name, data)
+
     def test_can_create_entities_with_labels(self):
         t = TestNode()
         tl = TesLabeldtNode()
