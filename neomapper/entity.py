@@ -43,15 +43,9 @@ class _Entity(type):
             if '_LABELS' in source:
                 glob['labels'] = source.get('_LABELS', None)
 
-            for n, v in source.items():
-                if isinstance(v, Property):
-                    if v.name:
-                        name = v.name
-                        v.name = n
-                    else:
-                        name = n
+            props = source.get('PROPERTIES', {})
 
-                    properties[name] = v
+            properties.update(props)
 
 
         def walk(bases):
@@ -68,16 +62,10 @@ class _Entity(type):
         walk(bases)
         get_props(attrs)
 
-
         def build_properties(self, data_type):
             props = {n: copy.deepcopy(p) for n, p in properties.items()}
             self.properties = PropertyManager(properties=props,
                 allow_undefined=glob['allow_undefined'], data_type=data_type)
-
-            """TODO: determine if we want the entity to retain the class
-            attribute or to nullify it"""
-            for name, prop in props.items():
-                setattr(self, name, None)
 
 
         if glob['labels']:

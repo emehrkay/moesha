@@ -30,40 +30,25 @@ class EntityTests(unittest.TestCase):
 
     def test_can_create_entity_and_remove_pre_defined_attributes(self):
         class X(Node):
-            id = Integer()
-            age = Integer()
+            PROPERTIES = {
+                'eye_id': Integer(),
+                'age': Integer(),
+            }
 
         id = 999
         age = 888
-        p = {'id': id, 'age': age}
+        p = {'eye_id': id, 'age': age}
         x = X(properties=p)
         id2 = 999
         age2 = 888
-        p2 = {'id': id2, 'age': age2}
+        p2 = {'eye_id': id2, 'age': age2}
         y = X(properties=p2)
 
-        self.assertEqual(x.id, None)
-        self.assertEqual(x.age, None)
-        self.assertEqual(x['id'], id)
+        self.assertEqual(x['eye_id'], id)
         self.assertEqual(x['age'], age)
 
-        self.assertEqual(y.id, None)
-        self.assertEqual(y.age, None)
-        self.assertEqual(y['id'], id2)
+        self.assertEqual(y['eye_id'], id2)
         self.assertEqual(y['age'], age2)
-
-    def test_can_create_entity_with_renamed_property(self):
-        name = '!!!! some name that cannot be a property'
-        default = 'xxxx'
-
-        class Y(Node):
-            zzz = String(name=name, default=default)
-
-        y = Y()
-        data = y.data
-
-        self.assertEqual(1, len(data))
-        self.assertIn(name, data)
 
     def test_can_create_entities_with_labels(self):
         t = TestNode()
@@ -88,18 +73,26 @@ class EntityTests(unittest.TestCase):
 
         class One(Node):
             _ALLOW_UNDEFINED = True
-            name = String()
+            PROPERTIES = {
+                'name': String()
+            }
 
         class Two(One):
             _LABELS = [_label]
-            age = Integer()
+            PROPERTIES = {
+                'age': Integer()
+            }
 
         class TwoTwo(One):
-            location = String()
+            PROPERTIES = {
+                'location': String()
+            }
 
         class Three(Two, TwoTwo):
             _ALLOW_UNDEFINED = False
-            sex = String()
+            PROPERTIES = {
+                'sex': String()
+            }
 
         t = Three()
         exp = ['name', 'age', 'sex', 'location']
@@ -115,18 +108,26 @@ class EntityTests(unittest.TestCase):
 
         class One(Node):
             _ALLOW_UNDEFINED = True
-            name = String()
+            PROPERTIES = {
+                'name': String()
+            }
 
         class Two(One):
             _LABELS = [_label]
-            age = Integer()
+            PROPERTIES = {
+                'age': Integer()
+            }
 
         class TwoTwo(One):
-            location = String()
+            PROPERTIES = {
+                'location': String()
+            }
 
         class Three(Two, TwoTwo):
             _ALLOW_UNDEFINED = False
-            sex = String()
+            PROPERTIES = {
+                'sex': String()
+            }
 
         props = {'name': 'mark', 'age': 999, 'location': 'earth'}
         t = Three(properties=props)
@@ -178,7 +179,9 @@ class EntityTests(unittest.TestCase):
 
     def test_can_delete_defined_field(self):
         class X(StructuredNode):
-            name = String()
+            PROPERTIES = {
+                'name': String()
+            }
 
         t = X()
         f = 'name'
@@ -203,7 +206,9 @@ class EntityTests(unittest.TestCase):
 
     def test_can_force_hyrdate_defined_fields(self):
         class X(StructuredNode):
-            time = TimeStamp()
+            PROPERTIES = {
+                'time': TimeStamp()
+            }
 
         t = X()
         p = {'time': 99999}
@@ -214,7 +219,9 @@ class EntityTests(unittest.TestCase):
 
     def test_cannot_hyrdate_defined_fields(self):
         class X(StructuredNode):
-            time = TimeStamp()
+            PROPERTIES = {
+                'time': TimeStamp()
+            }
 
         t = X()
         p = {'time': 99999}
