@@ -56,6 +56,59 @@ class MapperTests(unittest.TestCase):
         self.assertIsInstance(m2, TestLabeldtNodeMapper)
         self.assertEqual(id(m), id(m2))
 
+    def test_can_load_correct_mapper_for_entity(self):
+        class MyNode(Node):
+            pass
+
+        class MyNodeMapper(EntityMapper):
+            entity = MyNode
+
+        mapper = Mapper()
+        my_mapper = mapper.get_mapper(MyNode)
+
+        self.assertIsInstance(my_mapper, MyNodeMapper)
+
+    def test_can_load_generic_mapper_for_entity_without_mapper(self):
+        node = Node()
+        mapper = Mapper()
+        my_mapper = mapper.get_mapper(node)
+
+        self.assertEqual(my_mapper.__class__.__name__, 'EntityMapper')
+
+    def test_can_create_generic_node(self):
+        mapper = Mapper()
+        noade = mapper.create()
+
+    def test_can_create_custom_node(self):
+        mapper = Mapper()
+
+    def test_can_create_custom_node_with_properties(self):
+        mapper = Mapper()
+
+    def test_can_create_relationship(self):
+        self.assertTrue(False)
+
+    def test_can_create_before_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_before_save_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_after_save_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_before_update_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_after_update_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_before_delete_event_custom(self):
+        self.assertTrue(False)
+
+    def test_can_create_after_delete_event_custom(self):
+        self.assertTrue(False)
+
 
 class MapperCreateTests(unittest.TestCase):
 
@@ -114,7 +167,114 @@ class MapperCreateTests(unittest.TestCase):
 
 
 class MapperUpdateTests(unittest.TestCase):
-    pass
+
+    def setUp(self):
+        self.mapper = Mapper()
+
+    def test_can_udpate_single_node(self):
+        id = 999
+        name = 'some name'
+        n = Node(id=id)
+        n['name'] = name
+
+        self.mapper.save(n)
+        query, params = self.mapper.prepare()
+
+        self.assertEqual(1, len(query))
+        self.assertEqual(2, len(params))
+        self.assertIn('SET', query[0])
+        self.assertIn(name, params.values())
+        self.assertIn(id, params.values())
+
+    def test_can_update_multiple_nodes(self):
+        id = 999
+        name = 'some name'
+        n = Node(id=id)
+        n['name'] = name
+
+        id2 = 9992
+        name2 = 'some name222'
+        n2 = Node(id=id2)
+        n2['name'] = name2
+
+        self.mapper.save(n)
+        self.mapper.save(n2)
+        query, params = self.mapper.prepare()
+
+        self.assertEqual(2, len(query))
+        self.assertEqual(4, len(params))
+        self.assertIn('SET', query[0])
+        self.assertIn('SET', query[1])
+        self.assertIn(name, params.values())
+        self.assertIn(id, params.values())
+        self.assertIn(name2, params.values())
+        self.assertIn(id2, params.values())
+
+    def test_can_update_single_relationship(self):
+        id = 999
+        name = 'some name'
+        n = Node(id=id)
+        n['name'] = name
+
+        id2 = 9992
+        name2 = 'some name222'
+        n2 = Node(id=id2)
+        n2['name'] = name2
+        rid = 9988
+        rel = Relationship(start=n, end=n2, id=rid)
+
+        self.mapper.save(rel)
+        query, params = self.mapper.prepare()
+
+        self.assertEqual(1, len(query))
+        self.assertEqual(5, len(params))
+        self.assertIn('SET', query[0])
+        self.assertIn(name, params.values())
+        self.assertIn(id, params.values())
+        self.assertIn(name2, params.values())
+        self.assertIn(id2, params.values())
+        self.assertIn(rid, params.values())
+
+    def test_can_update_multiple_relationships(self):
+        id = 999
+        name = 'some name'
+        n = Node(id=id)
+        n['name'] = name
+
+        id2 = 9992
+        name2 = 'some name222'
+        n2 = Node(id=id2)
+        n2['name'] = name2
+        rid = 9988
+        rel = Relationship(start=n, end=n2, id=rid)
+
+        id3 = 997
+        name3 = 'some name ed'
+        n3 = Node(id=id3)
+        n3['name'] = name3
+
+        id4 = 99929
+        name4 = 'some name222 3'
+        n4 = Node(id=id4)
+        n4['name'] = name4
+        rid2 = 99887
+        rel2 = Relationship(start=n3, end=n4, id=rid2)
+
+        self.mapper.save(rel)
+        self.mapper.save(rel2)
+        query, params = self.mapper.prepare()
+
+        self.assertEqual(2, len(query))
+        self.assertEqual(10, len(params))
+        self.assertIn('SET', query[0])
+        self.assertIn(name, params.values())
+        self.assertIn(id, params.values())
+        self.assertIn(name2, params.values())
+        self.assertIn(id3, params.values())
+        self.assertIn(rid, params.values())
+        self.assertIn(id4, params.values())
+        self.assertIn(name3, params.values())
+        self.assertIn(name4, params.values())
 
 
 class MapperDeleteTests(unittest.TestCase):

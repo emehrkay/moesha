@@ -115,6 +115,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.before_events = []
         self.after_events = []
         self._build_relationships_()
+        self._property_changes = {}
 
     def reset(self):
         self.before_events = []
@@ -122,8 +123,14 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
     def create(self, entity=None, properties=None, label=None):
         properties = properties or {}
-
+        import pudb; pu.db
         if not entity:
+            if label:
+                entity = get_entity(label)
+            else:
+                entity = Node
+
+        if label and not entity:
             entity = get_entity(label)
 
         try:
