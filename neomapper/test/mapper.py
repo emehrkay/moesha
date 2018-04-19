@@ -57,16 +57,16 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(id(m), id(m2))
 
     def test_can_load_correct_mapper_for_entity(self):
-        class MyNode(Node):
+        class MyNodeTest(Node):
             pass
 
-        class MyNodeMapper(EntityMapper):
-            entity = MyNode
+        class MyNodeMapperTest(EntityMapper):
+            entity = MyNodeTest
 
         mapper = Mapper()
-        my_mapper = mapper.get_mapper(MyNode)
+        my_mapper = mapper.get_mapper(MyNodeTest)
 
-        self.assertIsInstance(my_mapper, MyNodeMapper)
+        self.assertIsInstance(my_mapper, MyNodeMapperTest)
 
     def test_can_load_generic_mapper_for_entity_without_mapper(self):
         node = Node()
@@ -77,37 +77,131 @@ class MapperTests(unittest.TestCase):
 
     def test_can_create_generic_node(self):
         mapper = Mapper()
-        noade = mapper.create()
+        node = mapper.create()
+
+        self.assertIsInstance(node, Node)
 
     def test_can_create_custom_node(self):
+        class MyNode(Node):
+            pass
+
         mapper = Mapper()
+        node = mapper.create(entity=MyNode)
+
+        self.assertIsInstance(node, MyNode)
 
     def test_can_create_custom_node_with_properties(self):
+        class MyNode(Node):
+            pass
+
         mapper = Mapper()
+        name = 'name{}'.format(random())
+        p = {'name': name}
+        node = mapper.create(entity=MyNode, properties=p)
+        data = node.data
 
-    def test_can_create_relationship(self):
-        self.assertTrue(False)
+        self.assertIsInstance(node, MyNode)
+        self.assertEqual(1, len(data))
+        self.assertEqual(name, data['name'])
 
-    def test_can_create_before_event_custom(self):
-        self.assertTrue(False)
+    def test_can_create_custom_relationship(self):
+        class MyRelationship(Relationship):
+            pass
+
+        mapper = Mapper()
+        rel = mapper.create(entity=MyRelationship)
+
+        self.assertIsInstance(rel, MyRelationship)
 
     def test_can_create_before_save_event_custom(self):
-        self.assertTrue(False)
+        mapper = Mapper()
+
+        class MyNode(Node):
+            pass
+
+        class MyNodeMapper(EntityMapper):
+            entity = MyNode
+
+            def on_before_save(self, entity):
+                self.before_save = self.updated
+
+        mn = mapper.create(entity=MyNode)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.before_save = 'BEFOERESAVE'
+        my_mapper.updated = 'UDPATED{}'.format(random())
+        mapper.save(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.before_save, my_mapper.updated)
+        self.assertEqual(1, len(query))
+        self.assertIn('CREATE', query[0])
 
     def test_can_create_after_save_event_custom(self):
-        self.assertTrue(False)
+        mapper = Mapper()
 
-    def test_can_create_before_update_event_custom(self):
-        self.assertTrue(False)
+        class MyNode1(Node):
+            pass
 
-    def test_can_create_after_update_event_custom(self):
-        self.assertTrue(False)
+        class MyNodeMapper1(EntityMapper):
+            entity = MyNode1
 
-    def test_can_create_before_delete_event_custom(self):
-        self.assertTrue(False)
+            def on_after_save(self, entity, response):
+                self.after_save = self.updated
 
-    def test_can_create_after_delete_event_custom(self):
-        self.assertTrue(False)
+        mn = mapper.create(entity=MyNode1)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_save = 'AFTERESAVE'
+        my_mapper.updated = 'UDPATED{}'.format(random())
+        mapper.save(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.after_save, my_mapper.updated)
+        self.assertEqual(1, len(query))
+        self.assertIn('CREATE', query[0])
+
+    def test_can_create_before_and_after_save_event_custom(self):
+        mapper = Mapper()
+
+        class MyNode2(Node):
+            pass
+
+        class MyNodeMapper2(EntityMapper):
+            entity = MyNode2
+
+            def on_before_save(self, entity):
+                self.before_save = self.updated_before
+
+            def on_after_save(self, entity, response):
+                self.after_save = self.updated_after
+
+        mn = mapper.create(entity=MyNode2)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_save = 'AFTERESAVE'
+        my_mapper.before_save = 'BEFOERESAVE'
+        my_mapper.updated_before = 'UDPATED{}'.format(random())
+        my_mapper.updated_after = 'UDPATED{}'.format(random())
+        mapper.save(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
+        self.assertEqual(my_mapper.before_save, my_mapper.updated_before)
+        self.assertEqual(1, len(query))
+        self.assertIn('CREATE', query[0])
+
+    # def test_can_create_before_update_event_custom(self):
+    #     self.assertTrue(False)
+    #
+    # def test_can_create_after_update_event_custom(self):
+    #     self.assertTrue(False)
+    #
+    # def test_can_create_before_delete_event_custom(self):
+    #     self.assertTrue(False)
+    #
+    # def test_can_create_after_delete_event_custom(self):
+    #     self.assertTrue(False)
 
 
 class MapperCreateTests(unittest.TestCase):

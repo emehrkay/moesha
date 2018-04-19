@@ -123,7 +123,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
     def create(self, entity=None, properties=None, label=None):
         properties = properties or {}
-        import pudb; pu.db
+
         if not entity:
             if label:
                 entity = get_entity(label)
@@ -261,19 +261,19 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def on_before_save(self, entity):
         pass
 
-    def on_after_save(self, entity):
+    def on_after_save(self, entity, response=None):
         pass
 
     def on_before_update(self, entity):
         pass
 
-    def on_after_update(self, entity):
+    def on_after_update(self, entity, response=None):
         pass
 
     def on_before_delete(self, entity):
         pass
 
-    def on_after_delete(self, entity):
+    def on_after_delete(self, entity, response=None):
         pass
 
 
@@ -332,7 +332,15 @@ class Mapper(object):
         return queries, params
 
     def send(self):
-        pass
+        queries, params = self.prepare()
+        response = [] #@TODO: build a real response object
+
+        self._execute_before()
+
+        for query in queries:
+            self.query(query=query, params=params)
+
+        self._execute_after()
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:
@@ -340,6 +348,16 @@ class Mapper(object):
             params = pypher.bound_params
         elif query:
             params = params or {}
+
+    def _execute_before(self):
+        for unit in self.units:
+            for before in unit.mapper.before_events:
+                before()
+
+    def _execute_after(self, response=None):
+        for unit in self.units:
+            for after in unit.mapper.after_events:
+                after(response=response)
 
 
 class Related(object):
