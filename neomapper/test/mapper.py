@@ -191,17 +191,112 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(1, len(query))
         self.assertIn('CREATE', query[0])
 
-    # def test_can_create_before_update_event_custom(self):
-    #     self.assertTrue(False)
-    #
-    # def test_can_create_after_update_event_custom(self):
-    #     self.assertTrue(False)
-    #
-    # def test_can_create_before_delete_event_custom(self):
-    #     self.assertTrue(False)
-    #
-    # def test_can_create_after_delete_event_custom(self):
-    #     self.assertTrue(False)
+    def test_can_create_before_and_after_update_events_custom(self):
+        mapper = Mapper()
+
+        class MyNode3(Node):
+            pass
+
+        class MyNodeMapper3(EntityMapper):
+            entity = MyNode3
+
+            def on_before_update(self, entity):
+                self.before_update = self.updated_before
+
+            def on_after_update(self, entity, response):
+                self.after_update = self.updated_after
+
+        mn = mapper.create(entity=MyNode3, id=999)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_update = 'AFTERESAVE'
+        my_mapper.before_update = 'BEFOERESAVE'
+        my_mapper.updated_before = 'UDPATED{}'.format(random())
+        my_mapper.updated_after = 'UDPATED{}'.format(random())
+        mapper.save(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.after_update, my_mapper.updated_after)
+        self.assertEqual(my_mapper.before_update, my_mapper.updated_before)
+        self.assertEqual(1, len(query))
+        self.assertIn('MATCH', query[0])
+
+    def test_can_create_before_and_after_delete_events_custom(self):
+        mapper = Mapper()
+
+        class MyNode4(Node):
+            pass
+
+        class MyNodeMapper4(EntityMapper):
+            entity = MyNode4
+
+            def on_before_delete(self, entity):
+                self.before_delete = self.deleted_before
+
+            def on_after_delete(self, entity, response):
+                self.after_delete = self.deleted_after
+
+        mn = mapper.create(entity=MyNode4, id=999)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_delete = 'AFTERDELETE'
+        my_mapper.before_delete = 'BEFOEREDELETE'
+        my_mapper.deleted_before = 'UDPATED{}'.format(random())
+        my_mapper.deleted_after = 'UDPATED{}'.format(random())
+        mapper.delete(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.after_delete, my_mapper.deleted_after)
+        self.assertEqual(my_mapper.before_delete, my_mapper.deleted_before)
+        self.assertEqual(1, len(query))
+        self.assertIn('MATCH', query[0])
+
+    def test_can_create_before_and_after_delete_and_save_events_custom(self):
+        mapper = Mapper()
+
+        class MyNode4(Node):
+            pass
+
+        class MyNodeMapper4(EntityMapper):
+            entity = MyNode4
+
+            def on_before_delete(self, entity):
+                self.before_delete = self.deleted_before
+
+            def on_after_delete(self, entity, response):
+                self.after_delete = self.deleted_after
+
+            def on_before_save(self, entity):
+                self.before_save = self.updated_before
+
+            def on_after_save(self, entity, response):
+                self.after_save = self.updated_after
+
+        mn = mapper.create(entity=MyNode4)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_save = 'AFTERESAVE'
+        my_mapper.before_save = 'BEFOERESAVE'
+        my_mapper.updated_before = 'UDPATED{}'.format(random())
+        my_mapper.updated_after = 'UDPATED{}'.format(random())
+        mapper.save(mn)
+
+        mn = mapper.create(entity=MyNode4, id=999)
+        my_mapper = mapper.get_mapper(mn)
+        my_mapper.after_delete = 'AFTERDELETE'
+        my_mapper.before_delete = 'BEFOEREDELETE'
+        my_mapper.deleted_before = 'UDPATED{}'.format(random())
+        my_mapper.deleted_after = 'UDPATED{}'.format(random())
+        mapper.delete(mn)
+        query, params = mapper.prepare()
+        mapper.send()
+
+        self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
+        self.assertEqual(my_mapper.before_save, my_mapper.updated_before)
+        self.assertEqual(my_mapper.after_delete, my_mapper.deleted_after)
+        self.assertEqual(my_mapper.before_delete, my_mapper.deleted_before)
+        self.assertEqual(2, len(query))
+        self.assertIn('CREATE', query[0])
+        self.assertIn('MATCH', query[1])
 
 
 class MapperCreateTests(unittest.TestCase):

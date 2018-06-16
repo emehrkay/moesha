@@ -50,6 +50,42 @@ class EntityTests(unittest.TestCase):
         self.assertEqual(y['eye_id'], id2)
         self.assertEqual(y['age'], age2)
 
+    def test_can_get_static_label_from_entity_withou_labels(self):
+        class StaticNode(Node):
+            pass
+
+        exp = 'StaticNode'
+        labels = StaticNode.labels
+
+        self.assertEqual(1, len(labels))
+        self.assertEqual(exp, labels[0])
+
+    def test_can_get_static_underscored_label_from_entity_withou_labels(self):
+        class StaticNode_Underscore(Node):
+            pass
+
+        exp = ['StaticNode', 'Underscore']
+        labels = StaticNode_Underscore.labels
+
+        self.assertEqual(2, len(labels))
+
+        for e in exp:
+            self.assertIn(e, labels)
+
+    def test_can_get_static_label_from_entity_with_labels(self):
+        l = ['One', 'TWO', 'ABC']
+
+        class StaticNode(Node):
+            _LABELS = l
+
+        exp = 'StaticNode'
+        labels = StaticNode.labels
+
+        self.assertEqual(len(l), len(labels))
+
+        for e in l:
+            self.assertIn(e, labels)
+
     def test_can_create_entities_with_labels(self):
         t = TestNode()
         tl = TesLabeldtNode()

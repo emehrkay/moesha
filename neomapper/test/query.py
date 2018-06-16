@@ -1,9 +1,10 @@
 import unittest
 
-from random import random
+from random import random, randint
 
 from neomapper.entity import (Node, Relationship)
-from neomapper.query import Query
+from neomapper.query import (Query, RelationshipQuery)
+from neomapper.mapper import (Mapper)
 
 
 def get_dict_key(dict, value):
@@ -89,7 +90,7 @@ class NodeQueryTests(unittest.TestCase):
         query, params = q.delete(detach=True)
         exp = "MATCH ({var}) WHERE id({var}) = ${id} DETACH DELETE {var}".format(
             var=n.query_variable, id=get_dict_key(params, _id))
-        print(exp)
+
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
@@ -437,6 +438,107 @@ class RelationshipQueryTests(unittest.TestCase):
 
         self.assertEqual(exp, query)
         self.assertEqual(2, len(params))
+
+
+class RelationshipOutQueryTests(unittest.TestCase):
+    direction = 'out'
+    relationship_template = '-[{var}:`{label}`]->'
+
+    class Start(Node):
+        pass
+
+
+    class End(Node):
+        pass
+
+
+    class Other(Node):
+        pass
+
+
+    class Knows(Relationship):
+        pass
+
+
+    def get_relationship(label, variable=''):
+        return self.relationship_template.format(var=var, label=label)
+
+    def setUp(self):
+        mapper = Mapper(connection=None)
+        self.start_mapper = mapper.get_mapper(self.Start)
+        self.end_mapper = mapper.get_mapper(self.End)
+
+    def test_can_get_out_realtionships_for_new_start_node(self):
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, direction=self.direction)
+        start = self.start_mapper.create()
+        self.start_mapper(start)
+
+        query, params = rq.query()
+        rel = self.get_relationship(self.Knows.labels[0])
+        exp = '(:`{start}`){rel}({end}) RETURN {end}'.format(
+            start=start.labels[0], rel=rel,
+            end=rq.other_end_key)
+        self.assertEqual(exp, query)
+        self.assertEqual(0, len(params))
+
+    def test_can_get_out_realtionships_for_existing_start_node(self):
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, direction=self.direction)
+        i_d = randint(10, 999)
+        start = self.start_mapper.create(id=i_d)
+
+        # set context
+        self.start_mapper(start)
+
+        query, params = rq.query()
+        rel = self.relationship_template.format(self.Knows.labels[0])
+        exp = ('({start}){rel}({end})'
+            ' WHERE id({start}) = ${id} RETURN {end}').format(
+            start=start.query_variable, rel=rel,
+            end=rq.other_end_key, id=get_dict_key(params, i_d))
+        self.assertEqual(exp, query)
+        self.assertEqual(1, len(params))
+
+    def test_can_get_single_out_realtionship_for_new_start_node(self):
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, single_relationship=True,
+            direction=self.direction)
+        start = self.start_mapper.create()
+        self.start_mapper(start)
+
+        query, params = rq.query()
+        rel = self.relationship_template.format(self.Knows.labels[0])
+        exp = '(:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
+            start=start.labels[0], rel=rel,
+            end=rq.other_end_key)
+        self.assertEqual(exp, query)
+        self.assertEqual(0, len(params))
+
+    def test_can_get_single_out_realtionship_for_existing_start_node(self):
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, single_relationship=True,
+            direction=self.direction)
+        start = self.start_mapper.create()
+        i_d = randint(10, 999)
+        start = self.start_mapper.create(id=i_d)
+        self.start_mapper(start)
+        query, params = rq.query()
+        rel = self.relationship_template.format(self.Knows.labels[0])
+        exp = ('({start}){rel}({end})'
+            ' WHERE id({start}) = ${id} RETURN {end} LIMIT 1').format(
+            start=start.query_variable, rel=rel,
+            end=rq.other_end_key, id=get_dict_key(params, i_d))
+        self.assertEqual(exp, query)
+        self.assertEqual(1, len(params))
+
+    def test_can_add_single_node_to_unrestricted_relationship(self):
+        pass
+
+
+class RelationshipInQueryTests(RelationshipOutQueryTests):
+    direction = 'in'
+    relationship_template = '<-[:`{}`]-'
 
 
 if __name__ == '__main__':

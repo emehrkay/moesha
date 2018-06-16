@@ -14,7 +14,7 @@ def entity_to_labels(entity):
     else:
         name = entity.__class__.__name__
 
-    parts = name.split('_')
+    parts = name.strip('_').split('_')
 
     return normalize_labels(*parts)
 

@@ -68,6 +68,8 @@ class _Entity(type):
                 allow_undefined=glob['allow_undefined'], data_type=data_type)
 
 
+        cls = super(_Entity, cls).__new__(cls, name, bases, attrs)
+
         if glob['labels']:
             if not isinstance(glob['labels'], (list, tuple, set)):
                 glob['labels'] = [glob['labels'],]
@@ -76,9 +78,9 @@ class _Entity(type):
         else:
             labels = entity_to_labels(cls)
 
-        cls = super(_Entity, cls).__new__(cls, name, bases, attrs)
         ENTITY_MAP[labels] = cls
         setattr(cls, '_build_properties', build_properties)
+        setattr(cls, 'labels', labels.split(':'))
 
         return cls
 

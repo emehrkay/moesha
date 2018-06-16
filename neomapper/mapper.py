@@ -8,7 +8,7 @@ from pypher.builder import Pypher, Params
 
 from .entity import (Node, StructuredNode, Relationship,
     StructuredRelationship, get_entity)
-from .query import Query
+from .query import (Query, RelationshipQuery)
 from .util import (entity_name)
 
 
@@ -45,7 +45,7 @@ class EntityQueryVariable(object):
 
     @classmethod
     def define(cls, entity):
-        if entity.query_variable:
+        if hasattr(entity, 'query_variable') and entity.query_variable:
             return entity.query_variable
 
         name = entity_name(entity)
@@ -68,6 +68,109 @@ class EntityQueryVariable(object):
 EQV = EntityQueryVariable
 
 
+class RelatedManager(object):
+
+    def __init__(self, mapper, relationships, allow_undefined=True):
+        self._relationships = {}
+        self.relationships = relationships or {}
+        self.allow_undefined = allow_undefined
+
+    def __call__(self, entity):
+        for _, rel in self._relationships:
+            rel.start_entity = entity
+
+    def _get_relationships(self):
+        return self._relationships
+
+    def _set_relationships(self, relationships=None):
+        self._relationships = relationships or {}
+
+    def __getitem__(self, name):
+        self.get_relationship(name)
+
+    def get_relationship(self, name):
+        if name in self.relationships:
+            return self.relationships[name]
+
+        if self.allow_undefined:
+            return Related(mapper=self.mapper)
+
+
+class RelatedEntity(object):
+
+    def __init__(self, relationship_entity=None, relationship_type=None,
+                 direction='out', mapper=None, pagination_count=None):
+        if not relationship_entity and not relationship_type:
+            raise Exception()
+
+        self.relationship_entity = relationship_entity
+        self.relationship_type = relationship_type
+        self.direction = direction
+        self.results = None
+        self._mapper = mapper
+        self._limit = None
+        self._skip = None
+        self.relationship_query = RelationshipQuery(mapper=mapper,
+            relationship_entity=relationship_entity,
+            relationship_type=relationship_type, direction=direction)
+
+    def reset(self):
+        self._skip = None
+        self._limit = None
+        self.results = None
+        self.relationship_query.reset()
+
+        return self
+
+    def __call__(self, limit=None, skip=None):
+        return self._traverse(limit=limit, skip=skip)
+
+    def _get_mapper(self):
+        return self._mapper
+
+    def _set_mapper(self, mapper):
+        self._mapper = mapper
+        self.relationship_query.mapper = mapper
+
+        return self
+
+    mapper = property(_get_mapper, _set_mapper)
+
+    def skip(self, skip):
+        self._skip = skip
+
+        return self
+
+    def limit(self, limit):
+        self._limit = limit
+
+        return self
+
+    def connect(self, start, end, **properties):
+        relationship_mapper = self.mapper.get_mapper(self.relationship_entity)
+        relationship = relationship_mapper.create(**properties)
+        relationship_mapper.connect(start=start, end=end,
+            relationship_entity=relationship)
+
+    def _traverse(self, limit=None, skip=None):
+        query, params = self.query(limit=limit, skip=skip)
+
+    def query(self, limit=None, skip=None):
+        limit = limit or self._limit
+        skip = skip or self._skip
+        self.relationship_query.start_entity = self.mapper.entity_context
+        self.relationship_query.skip = skip
+        self.relationship_query.limit = limit
+
+        return self.relationship_query.query()
+
+    def next(self):
+        return self
+
+    def iter(self):
+        return self
+
+
 class _Unit(object):
 
     def __init__(self, entity, action, mapper, **kwargs):
@@ -83,7 +186,7 @@ class _RootMapper(type):
         relationships = {}
 
         for n, rel in attrs.items():
-            if isinstance(rel, Relationship):
+            if isinstance(rel, RelatedEntity):
                 relationships[n] = rel
 
         def _build_relationships(self):
@@ -93,6 +196,9 @@ class _RootMapper(type):
                 rel.entity = self.entity
 
                 setattr(self, name, rel)
+
+            self.relationships = RelatedManager(mapper=self,
+                relationships=relationships)
 
         cls = super(_RootMapper, cls).__new__(cls, name, bases, attrs)
         entity = attrs.pop('entity', None)
@@ -109,6 +215,7 @@ class _RootMapper(type):
 
 
 class EntityMapper(with_metaclass(_RootMapper)):
+    entity = None
 
     def __init__(self, mapper=None):
         self.mapper = mapper
@@ -116,12 +223,32 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.after_events = []
         self._build_relationships_()
         self._property_changes = {}
+        self._entity_context = None
 
     def reset(self):
         self.before_events = []
         self.after_events = []
+        self._entity_context = None
 
-    def create(self, entity=None, properties=None, label=None):
+    def __call__(self, entity=None):
+        self.entity_context = entity
+        self.relationships(entity)
+
+        return self
+
+    def _get_entity_context(self):
+        return self._entity_context or entity
+
+    def _set_entity_context(self, entity):
+        self._entity_context = entity
+
+    def _delete_entity_context(self):
+        self._entity_context = None
+
+    entity_context = property(_get_entity_context, _set_entity_context,
+        _delete_entity_context)
+
+    def create(self, id=None, entity=None, properties=None, label=None):
         properties = properties or {}
 
         if not entity:
@@ -134,7 +261,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
             entity = get_entity(label)
 
         try:
-            entity = entity(properties=properties)
+            entity = entity(id=id, properties=properties)
         except Exception as e:
             raise e
 
@@ -199,6 +326,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return self
 
     def delete(self, entity, detach=True):
+        self.apply_delete(entity)
         unit = _Unit(entity=entity, action='_delete_entity', mapper=self,
             detach=detach)
 
@@ -312,10 +440,11 @@ class Mapper(object):
 
         return mapper.delete(entity, detach=detach)
 
-    def create(self, entity=None, properties=None, label=None):
+    def create(self, id=None, entity=None, properties=None, label=None):
         mapper = self.get_mapper(entity=entity)
 
-        return mapper.create(entity=entity, properties=properties, label=label)
+        return mapper.create(id=id, entity=entity, properties=properties,
+            label=label)
 
     def prepare(self):
         queries = []
@@ -358,40 +487,3 @@ class Mapper(object):
         for unit in self.units:
             for after in unit.mapper.after_events:
                 after(response=response)
-
-
-class Related(object):
-
-    def __init__(self, other_entity, relationship_entity=None,
-                 direction='out'):
-        self.other_entity = other_entity
-        self.relationship_entity = relationship_entity
-        self.direction = direction
-        self.results = None
-        self.mapper = None
-        self.pypher = Pypher()
-
-    def __call__(self, entity=None):
-        return self._traverse()
-
-    def _traverse(self, entity=None):
-        pypher = self.pypher
-        pypher.node()
-
-        if self.relationship_entity:
-            pypher.rel(label=self.relationship_entity.label,
-                direction=self.direction)
-        else:
-            pypher.rel(direction=self.direction)
-
-        pypher.node(label=self.other_entity.label)
-        self.results = self.mapper.query(self.query)
-
-    def query(self):
-        return self.pypher
-
-    def next(self):
-        return self
-
-    def iter(self):
-        return self
