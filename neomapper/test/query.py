@@ -3,7 +3,8 @@ import unittest
 from random import random, randint
 
 from neomapper.entity import (Node, Relationship)
-from neomapper.query import (Query, RelationshipQuery)
+from neomapper.query import (Query, RelationshipQuery, QueryException,
+    RelatedQueryException)
 from neomapper.mapper import (Mapper)
 
 
@@ -460,15 +461,26 @@ class RelationshipOutQueryTests(unittest.TestCase):
         pass
 
 
-    def get_relationship(label, variable=''):
-        return self.relationship_template.format(var=var, label=label)
+    def get_relationship(self, label, variable=''):
+        return self.relationship_template.format(var=variable, label=label)
 
     def setUp(self):
         mapper = Mapper(connection=None)
         self.start_mapper = mapper.get_mapper(self.Start)
         self.end_mapper = mapper.get_mapper(self.End)
 
-    def test_can_get_out_realtionships_for_new_start_node(self):
+    def test_cannot_get_relationship_because_missing_context(self):
+        self.start_mapper.reset()
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, single_relationship=False,
+            direction=self.direction)
+        
+        def get():
+            rq.query()
+        
+        self.assertRaises(RelatedQueryException, get)
+
+    def test_can_get_realtionships_for_new_start_node(self):
         rq = RelationshipQuery(mapper=self.start_mapper,
             relationship_entity=self.Knows, direction=self.direction)
         start = self.start_mapper.create()
@@ -482,7 +494,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.assertEqual(exp, query)
         self.assertEqual(0, len(params))
 
-    def test_can_get_out_realtionships_for_existing_start_node(self):
+    def test_can_get_realtionships_for_existing_start_node(self):
         rq = RelationshipQuery(mapper=self.start_mapper,
             relationship_entity=self.Knows, direction=self.direction)
         i_d = randint(10, 999)
@@ -492,7 +504,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.relationship_template.format(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels[0])
         exp = ('({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end}').format(
             start=start.query_variable, rel=rel,
@@ -500,7 +512,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
-    def test_can_get_single_out_realtionship_for_new_start_node(self):
+    def test_can_get_single_realtionship_for_new_start_node(self):
         rq = RelationshipQuery(mapper=self.start_mapper,
             relationship_entity=self.Knows, single_relationship=True,
             direction=self.direction)
@@ -508,14 +520,14 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.relationship_template.format(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels[0])
         exp = '(:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
             start=start.labels[0], rel=rel,
             end=rq.other_end_key)
         self.assertEqual(exp, query)
         self.assertEqual(0, len(params))
 
-    def test_can_get_single_out_realtionship_for_existing_start_node(self):
+    def test_can_get_single_realtionship_for_existing_start_node(self):
         rq = RelationshipQuery(mapper=self.start_mapper,
             relationship_entity=self.Knows, single_relationship=True,
             direction=self.direction)
@@ -524,7 +536,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         start = self.start_mapper.create(id=i_d)
         self.start_mapper(start)
         query, params = rq.query()
-        rel = self.relationship_template.format(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels[0])
         exp = ('({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end} LIMIT 1').format(
             start=start.query_variable, rel=rel,
@@ -532,13 +544,26 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
-    def test_can_add_single_node_to_unrestricted_relationship(self):
-        pass
+    def test_cannot_add_new_node_to_unrestricted_relationship(self):
+        self.start_mapper.reset()
+        rq = RelationshipQuery(mapper=self.start_mapper,
+            relationship_entity=self.Knows, single_relationship=False,
+            direction=self.direction)
+
+        def add():
+            end = self.end_mapper.create()
+            rq.connect(end)
+
+        self.assertRaises(RelatedQueryException, add)
+
+    # note: The RelationshipQuery class utilizes the Query class and actual
+    # query building tests are taken care of in
+    # neomapper.test.mapper.RelationshipQueryTests. No need to repeat it here
 
 
 class RelationshipInQueryTests(RelationshipOutQueryTests):
     direction = 'in'
-    relationship_template = '<-[:`{}`]-'
+    relationship_template = '<-[{var}:`{label}`]-'
 
 
 if __name__ == '__main__':

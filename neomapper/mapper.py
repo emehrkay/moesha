@@ -237,7 +237,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return self
 
     def _get_entity_context(self):
-        return self._entity_context or entity
+        return self._entity_context
 
     def _set_entity_context(self, entity):
         self._entity_context = entity
@@ -248,22 +248,21 @@ class EntityMapper(with_metaclass(_RootMapper)):
     entity_context = property(_get_entity_context, _set_entity_context,
         _delete_entity_context)
 
-    def create(self, id=None, entity=None, properties=None, label=None):
+    def create(self, id=None, entity=None, properties=None, label=None,
+               entity_type='node'):
         properties = properties or {}
-
-        if not entity:
-            if label:
-                entity = get_entity(label)
-            else:
-                entity = Node
 
         if label and not entity:
             entity = get_entity(label)
 
         try:
             entity = entity(id=id, properties=properties)
-        except Exception as e:
-            raise e
+        except:
+            if entity_type == 'relationship':
+                entity = Relationship(id=id, labels=label,
+                    properties=properties)
+            else:
+                entity = Node(id=id, properties=properties, labels=label)
 
         return entity
 
@@ -440,11 +439,12 @@ class Mapper(object):
 
         return mapper.delete(entity, detach=detach)
 
-    def create(self, id=None, entity=None, properties=None, label=None):
+    def create(self, id=None, entity=None, properties=None, label=None,
+               entity_type='node'):
         mapper = self.get_mapper(entity=entity)
 
         return mapper.create(id=id, entity=entity, properties=properties,
-            label=label)
+            label=label, entity_type=entity_type)
 
     def prepare(self):
         queries = []

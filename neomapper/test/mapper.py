@@ -104,6 +104,12 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(1, len(data))
         self.assertEqual(name, data['name'])
 
+    def test_can_create_generic_relationship(self):
+        mapper = Mapper()
+        relationship = mapper.create(entity_type='relationship')
+
+        self.assertIsInstance(relationship, Relationship)
+
     def test_can_create_custom_relationship(self):
         class MyRelationship(Relationship):
             pass

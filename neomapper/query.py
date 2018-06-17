@@ -185,7 +185,8 @@ class Query(_BaseQuery):
             _id = VM.get_next(entity, 'id')
             _id = Param(_id, entity.id)
             rel = __.node(start.query_variable, **start_properties)
-            rel.rel(entity.query_variable, labels=entity.label, direction='out')
+            rel.rel(entity.query_variable, labels=entity.label,
+                direction='out')
             rel.node(end.query_variable, **end_properties)
             rel.WHERE(__.ID(entity.query_variable) == _id)
             self._update_properties(entity)
@@ -365,7 +366,8 @@ class RelationshipQuery(_BaseQuery):
         self.start_entity = self.mapper.entity_context
 
         if not self.start_entity:
-            raise Exception('Related objects must have a start entity')
+            raise RelatedQueryException(('Related objects must have a'
+                ' start entity'))
 
         self.pypher = Pypher()
         pypher = self.pypher
@@ -385,20 +387,29 @@ class RelationshipQuery(_BaseQuery):
 
         return str(pypher), pypher.bound_params
 
-    def connect(self, entity, propeties=None):
-        propeties = propeties or {}
-        
+    def connect(self, entity, properties=None):
+        start = self.mapper.entity_context
 
-class ConnectionQuery(object):
+        if not start:
+            raise RelatedQueryException(('The relationship {} does not '))
 
-    def __init__(self, mapper, start, relationship, end, direction='out',
-                 properties=None):
-        self.mapper = mapper
-        self.start = start
-        self.end = end
-        self.relationship = relationship
-        self.direction = direction
-        self.properties = properties or {}
+        if self.relationship_entity:
+            relationship = self.mapper.create(entity=self.relationship_entity,
+                properties=properties)
+        else:
+            relationship = self.mapper.create(entity_type='relationship',
+                properties=properties)
 
-    def query(self):
-        
+        relationship.start = start
+        relationship.end = entity
+        query = Query(entities=[relationship], params=self.params)
+
+        return query.save()
+
+
+class QueryException(Exception):
+    pass
+
+
+class RelatedQueryException(QueryException):
+    pass
