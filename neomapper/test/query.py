@@ -488,7 +488,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
         query, params = rq.query()
         rel = self.get_relationship(self.Knows.labels[0])
-        exp = '(:`{start}`){rel}({end}) RETURN {end}'.format(
+        exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end}'.format(
             start=start.labels[0], rel=rel,
             end=rq.other_end_key)
         self.assertEqual(exp, query)
@@ -505,7 +505,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
         query, params = rq.query()
         rel = self.get_relationship(self.Knows.labels[0])
-        exp = ('({start}){rel}({end})'
+        exp = ('MATCH ({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end}').format(
             start=start.query_variable, rel=rel,
             end=rq.other_end_key, id=get_dict_key(params, i_d))
@@ -521,9 +521,10 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
         query, params = rq.query()
         rel = self.get_relationship(self.Knows.labels[0])
-        exp = '(:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
+        exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
             start=start.labels[0], rel=rel,
             end=rq.other_end_key)
+
         self.assertEqual(exp, query)
         self.assertEqual(0, len(params))
 
@@ -537,7 +538,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
         query, params = rq.query()
         rel = self.get_relationship(self.Knows.labels[0])
-        exp = ('({start}){rel}({end})'
+        exp = ('MATCH ({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end} LIMIT 1').format(
             start=start.query_variable, rel=rel,
             end=rq.other_end_key, id=get_dict_key(params, i_d))
@@ -558,7 +559,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
     # note: The RelationshipQuery class utilizes the Query class and actual
     # query building tests are taken care of in
-    # neomapper.test.mapper.RelationshipQueryTests. No need to repeat it here
+    # neomapper.test.query.RelationshipQueryTests. No need to repeat it here
 
 
 class RelationshipInQueryTests(RelationshipOutQueryTests):

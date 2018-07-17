@@ -208,7 +208,7 @@ class StructuredRelationship(Relationship):
 class Collection(object):
 
     def __init__(self, entities=None):
-        if not isinstance(entities, (list, set, tuple)):
+        if entities and not isinstance(entities, (list, set, tuple)):
             entities = [entities,]
         elif isinstance(entities, Collection):
             entities = entities.entities
@@ -233,12 +233,12 @@ class Collection(object):
 
     def __iter__(self):
         return self
+    
+    def __iter__(self):
+        return self
 
-    def next(self):
-        try:
-            entity = self.entities[self.index]
-            self.index += 1
+    def __next__(self):
+        entity = self[self.index]
+        self.index += 1
 
-            return entity
-        except Exception as e:
-            raise StopIteration()
+        return entity

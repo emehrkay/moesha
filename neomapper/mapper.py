@@ -6,9 +6,11 @@ from six import with_metaclass
 
 from pypher.builder import Pypher, Params
 
+from neo4j import v1
+
 from .entity import (Node, StructuredNode, Relationship,
-    StructuredRelationship, get_entity)
-from .query import (Query, RelationshipQuery)
+    StructuredRelationship, get_entity, Collection)
+from .query import (Query, RelationshipQuery, Helpers)
 from .util import (entity_name)
 
 
@@ -74,16 +76,21 @@ class RelatedManager(object):
         self._relationships = {}
         self.relationships = relationships or {}
         self.allow_undefined = allow_undefined
+        self.mapper = mapper
 
     def __call__(self, entity):
-        for _, rel in self._relationships:
+        for _, rel in self.relationships.items():
             rel.start_entity = entity
+
+        return self
 
     def _get_relationships(self):
         return self._relationships
 
     def _set_relationships(self, relationships=None):
         self._relationships = relationships or {}
+
+    relationships = property(_get_relationships, _set_relationships)
 
     def __getitem__(self, name):
         self.get_relationship(name)
@@ -93,7 +100,7 @@ class RelatedManager(object):
             return self.relationships[name]
 
         if self.allow_undefined:
-            return Related(mapper=self.mapper)
+            return RelatedEntity(mapper=self.mapper)
 
 
 class RelatedEntity(object):
@@ -123,7 +130,10 @@ class RelatedEntity(object):
         return self
 
     def __call__(self, limit=None, skip=None):
-        return self._traverse(limit=limit, skip=skip)
+        unit = _Unit(entity=self.mapper.entity_context, action='query',
+            mapper=self, limit=limit, skip=skip)
+
+        return self.mapper.mapper.add_unit(unit).send()
 
     def _get_mapper(self):
         return self._mapper
@@ -155,7 +165,7 @@ class RelatedEntity(object):
     def _traverse(self, limit=None, skip=None):
         query, params = self.query(limit=limit, skip=skip)
 
-    def query(self, limit=None, skip=None):
+    def query(self, limit=None, skip=None, **kwargs):
         limit = limit or self._limit
         skip = skip or self._skip
         self.relationship_query.start_entity = self.mapper.entity_context
@@ -249,7 +259,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         _delete_entity_context)
 
     def create(self, id=None, entity=None, properties=None, label=None,
-               entity_type='node'):
+               start=None, end=None, entity_type='node'):
         properties = properties or {}
 
         if label and not entity:
@@ -260,7 +270,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         except:
             if entity_type == 'relationship':
                 entity = Relationship(id=id, labels=label,
-                    properties=properties)
+                    properties=properties, start=start, end=end)
             else:
                 entity = Node(id=id, properties=properties, labels=label)
 
@@ -288,10 +298,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 end = entity.end
 
                 if not isinstance(start, Node):
-                    raise ArgumentException()
+                    raise MapperException()
 
                 if not isinstance(end, Node):
-                    raise ArgumentException()
+                    raise MapperException()
 
                 EQV.define(start)
                 EQV.define(end)
@@ -316,7 +326,18 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
                 transaction['action'] = '_create_relationship'
         else:
-            raise ArgumentException('NOT ALLOWED')
+            raise MapperException('NOT ALLOWED')
+
+        # ensure that the entity is updated with the newest data after the
+        # queries are run
+        def ensure_udpate(response):
+            for res in response.result_data:
+                for var, node in res.items():
+                    if var == entity.query_variable:
+                        entity.id = node.id
+                        entity.hydrate(**node.properties)
+
+        self.after_events.append(ensure_udpate)
 
         EQV.define(entity)
         unit = _Unit(**transaction)
@@ -403,6 +424,36 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def on_after_delete(self, entity, response=None):
         pass
 
+    # Utility methods
+    def get_by_id(self, id_val=None):
+        '''This method will return an entity by id. It does not attempt to
+        cast the resulting node into the type that the current EntityMapper
+        handles, but will return whatever entity belongs to the id_val'''
+        unit = _Unit(entity=self.entity(), action='_get_by_id', mapper=self,
+            id_val=id_val)
+        self.mapper.add_unit(unit)
+        query, params = self.mapper.prepare()
+        result = self.mapper.query(query=query[0], params=params)
+
+        if len(result) > 1:
+            err = ('There was more than one result for id: {}'.format(id_val))
+            raise MapperException(err)
+
+        return result[0] if len(result) else None
+
+    def _get_by_id(self, entity, id_val=None):
+        helpers = Helpers()
+
+        return helpers.get_by_id(entity=entity, id_val=id_val)
+
+
+class EntityNodeMapper(EntityMapper):
+    entity = Node
+
+
+class EntityRelationshipMapper(EntityMapper):
+    entity = Relationship
+
 
 class Mapper(object):
     PARAM_PREFIX = '$NM'
@@ -440,11 +491,17 @@ class Mapper(object):
         return mapper.delete(entity, detach=detach)
 
     def create(self, id=None, entity=None, properties=None, label=None,
-               entity_type='node'):
+               entity_type='node', start=None, end=None):
         mapper = self.get_mapper(entity=entity)
 
         return mapper.create(id=id, entity=entity, properties=properties,
-            label=label, entity_type=entity_type)
+            label=label, entity_type=entity_type, start=start, end=end)
+
+    def get_by_id(self, entity=None, id_val=None):
+        entity = entity or Node
+        mapper = self.get_mapper(entity=entity)
+
+        return mapper.get_by_id(id_val=id_val)
 
     def prepare(self):
         queries = []
@@ -462,28 +519,85 @@ class Mapper(object):
 
     def send(self):
         queries, params = self.prepare()
-        response = [] #@TODO: build a real response object
+        response = Response(mapper=self)
 
         self._execute_before()
 
         for query in queries:
-            self.query(query=query, params=params)
+            response += self.query(query=query, params=params).data
 
-        self._execute_after()
+        return response
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:
             query = str(pypher)
             params = pypher.bound_params
-        elif query:
-            params = params or {}
+
+        params = params or {}
+        res = self.connection.query(query=query, params=params)
+        response = Response(mapper=self, data=res.data)
+
+        self._execute_after(res)
+
+        return response
 
     def _execute_before(self):
         for unit in self.units:
-            for before in unit.mapper.before_events:
-                before()
+            if hasattr(unit.mapper, 'before_events'):
+                for before in unit.mapper.before_events:
+                    before()
 
     def _execute_after(self, response=None):
         for unit in self.units:
-            for after in unit.mapper.after_events:
-                after(response=response)
+            if hasattr(unit.mapper, 'after_events'):
+                for after in unit.mapper.after_events:
+                    after(response=response)
+
+
+class Response(Collection):
+
+    def __init__(self, mapper, data=None):
+        self.mapper = mapper
+        self.data = data or []
+        super(Response, self).__init__()
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, key):
+        try:
+            return self.entities[key]
+        except Exception as e:
+            try:
+                data = self.data[key]
+                start = None
+                end = None
+                entity_type = 'node'
+
+                if isinstance(data, v1.Relationship):
+                    entity_type = 'relationship'
+                    start = data.start
+                    end = data.end
+
+                entity = self.mapper.create(id=data.id,
+                    properties=data.properties, entity_type=entity_type,
+                    start=start, end=end)
+
+                self.entities.append(entity)
+
+                return entity
+            except Exception as e:
+                self.index = 0
+                raise StopIteration()
+
+    def __iadd__(self, other):
+        if isinstance(other, Response):
+            self.data.extend(other.data)
+        else:
+            self.data.extend(other)
+
+        return self
+
+
+class MapperException(Exception):
+    pass

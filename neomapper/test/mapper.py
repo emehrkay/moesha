@@ -2,12 +2,24 @@ import unittest
 import json
 import time
 
-from random import random
+from random import random, randint
 
 from neomapper.entity import (Node, StructuredNode, Relationship,
     StructuredRelationship)
 from neomapper.property import (String, Integer, TimeStamp)
 from neomapper.mapper import (Mapper, EntityMapper, get_mapper)
+
+
+class TestConnection(object):
+
+    def query(*args, **kwargs):
+        class res(object):
+            data = []
+            result_data = []
+
+        return res()
+
+TC = TestConnection()
 
 
 class TestNode(Node):
@@ -34,7 +46,7 @@ class MapperTests(unittest.TestCase):
         self.assertIsInstance(m, EntityMapper)
 
     def test_can_get_mapper_single_instance_from_entity_class(self):
-        mapper = Mapper(None)
+        mapper = Mapper(TC)
         m = get_mapper(TestLabeldtNode, mapper)
         m2 = mapper.get_mapper(TestLabeldtNode)
 
@@ -45,7 +57,7 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(id(m), id(m2))
 
     def test_can_get_mapper_single_instance_from_entity_instance(self):
-        mapper = Mapper(None)
+        mapper = Mapper(TC)
         tn = TestLabeldtNode()
         m = get_mapper(tn, mapper)
         m2 = mapper.get_mapper(tn)
@@ -63,20 +75,20 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapperTest(EntityMapper):
             entity = MyNodeTest
 
-        mapper = Mapper()
+        mapper = Mapper(TC)
         my_mapper = mapper.get_mapper(MyNodeTest)
 
         self.assertIsInstance(my_mapper, MyNodeMapperTest)
 
     def test_can_load_generic_mapper_for_entity_without_mapper(self):
         node = Node()
-        mapper = Mapper()
+        mapper = Mapper(TC)
         my_mapper = mapper.get_mapper(node)
 
         self.assertEqual(my_mapper.__class__.__name__, 'EntityMapper')
 
     def test_can_create_generic_node(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
         node = mapper.create()
 
         self.assertIsInstance(node, Node)
@@ -85,7 +97,7 @@ class MapperTests(unittest.TestCase):
         class MyNode(Node):
             pass
 
-        mapper = Mapper()
+        mapper = Mapper(TC)
         node = mapper.create(entity=MyNode)
 
         self.assertIsInstance(node, MyNode)
@@ -94,7 +106,7 @@ class MapperTests(unittest.TestCase):
         class MyNode(Node):
             pass
 
-        mapper = Mapper()
+        mapper = Mapper(TC)
         name = 'name{}'.format(random())
         p = {'name': name}
         node = mapper.create(entity=MyNode, properties=p)
@@ -105,7 +117,7 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(name, data['name'])
 
     def test_can_create_generic_relationship(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
         relationship = mapper.create(entity_type='relationship')
 
         self.assertIsInstance(relationship, Relationship)
@@ -114,13 +126,13 @@ class MapperTests(unittest.TestCase):
         class MyRelationship(Relationship):
             pass
 
-        mapper = Mapper()
+        mapper = Mapper(TC)
         rel = mapper.create(entity=MyRelationship)
 
         self.assertIsInstance(rel, MyRelationship)
 
     def test_can_create_before_save_event_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode(Node):
             pass
@@ -144,7 +156,7 @@ class MapperTests(unittest.TestCase):
         self.assertIn('CREATE', query[0])
 
     def test_can_create_after_save_event_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode1(Node):
             pass
@@ -168,7 +180,7 @@ class MapperTests(unittest.TestCase):
         self.assertIn('CREATE', query[0])
 
     def test_can_create_before_and_after_save_event_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode2(Node):
             pass
@@ -198,7 +210,7 @@ class MapperTests(unittest.TestCase):
         self.assertIn('CREATE', query[0])
 
     def test_can_create_before_and_after_update_events_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode3(Node):
             pass
@@ -228,7 +240,7 @@ class MapperTests(unittest.TestCase):
         self.assertIn('MATCH', query[0])
 
     def test_can_create_before_and_after_delete_events_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode4(Node):
             pass
@@ -258,7 +270,7 @@ class MapperTests(unittest.TestCase):
         self.assertIn('MATCH', query[0])
 
     def test_can_create_before_and_after_delete_and_save_events_custom(self):
-        mapper = Mapper()
+        mapper = Mapper(TC)
 
         class MyNode4(Node):
             pass
@@ -308,7 +320,7 @@ class MapperTests(unittest.TestCase):
 class MapperCreateTests(unittest.TestCase):
 
     def setUp(self):
-        self.mapper = Mapper(None)
+        self.mapper = Mapper(TC)
 
         return self
 
@@ -364,7 +376,7 @@ class MapperCreateTests(unittest.TestCase):
 class MapperUpdateTests(unittest.TestCase):
 
     def setUp(self):
-        self.mapper = Mapper()
+        self.mapper = Mapper(TC)
 
     def test_can_udpate_single_node(self):
         id = 999
@@ -475,7 +487,7 @@ class MapperUpdateTests(unittest.TestCase):
 class MapperDeleteTests(unittest.TestCase):
 
     def setUp(self):
-        self.mapper = Mapper()
+        self.mapper = Mapper(TC)
 
     def test_can_delete_single_node(self):
         _id = 999
@@ -539,9 +551,17 @@ class MapperDeleteTests(unittest.TestCase):
         for q in query:
             self.assertTrue('DELETE' in q)
 
-
-class MapperCombinedTests(unittest.TestCase):
-    pass
+# TODO move to integration testing
+# class MapperBuilderTests(unittest.TestCase):
+#
+#     def setUp(self):
+#         self.mapper = Mapper(TC)
+#
+#     def test_can_get_by_id(self):
+#         import pudb; pu.db
+#         id_val = randint(1, 9999)
+#         query, params = self.mapper.get_by_id(id_val=id_val)
+#         import pudb; pu.db
 
 
 if __name__ == '__main__':

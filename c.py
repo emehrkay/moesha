@@ -10,6 +10,7 @@ p.CREATE.node('user', 'User', Name='Jim').RETURN.user
 print(str(p), p.bound_params)
 
 with driver.session() as  session:
-    result = session.run(str(p), **p.bound_params)
+    
+    result = session.run('MATCH ()-[r]->() return distinct(r)', **p.bound_params)
 
     print(result.data())

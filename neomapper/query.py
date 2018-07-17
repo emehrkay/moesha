@@ -37,7 +37,7 @@ VM = _ValueManager
 
 class _BaseQuery(object):
 
-    def __init__(self):
+    def __init__(self, params=None):
         self.creates = []
         self.matches = []
         self.deletes = []
@@ -45,6 +45,7 @@ class _BaseQuery(object):
         self.sets = []
         self.wheres = []
         self.returns = []
+        self.pypher = Pypher(params=params)
 
     def _node_by_id(self, entity):
         qv = entity.query_variable
@@ -57,7 +58,7 @@ class _BaseQuery(object):
 
         return __.node(qv).WHERE(__.ID(qv) == _id)
 
-    def _node_by_id_builder(self, entity):
+    def _entity_by_id_builder(self, entity):
         qv = entity.query_variable
 
         if not qv:
@@ -65,11 +66,17 @@ class _BaseQuery(object):
 
         _id = VM.get_next(entity, 'id')
         _id = Param(_id, entity.id)
-        node = __.node(qv)
-        where = __.WHERE(__.ID(qv) == _id)
+
+        if isinstance(entity, Relationship):
+            node = __.node().relationship(qv).node()
+        else:
+            node = __.node(qv)
+
+        where = __.ID(qv) == _id
 
         self.matches.append(node)
         self.wheres.append(where)
+        self.returns.append(entity.query_variable)
 
         return self
 
@@ -77,13 +84,12 @@ class _BaseQuery(object):
 class Query(_BaseQuery):
 
     def __init__(self, entities, params=None):
-        super(Query, self).__init__()
+        super(Query, self).__init__(params=params)
 
         if not isinstance(entities, (Collection, list, set, tuple)):
             entities = [entities,]
 
         self.entities = entities
-        self.pypher = Pypher(params=params)
 
     def save(self):
         for entity in self.entities:
@@ -271,6 +277,31 @@ class Query(_BaseQuery):
         return self
 
 
+class Helpers(_BaseQuery):
+
+    def get_by_id(self, entity, id_val=None):
+        '''This method is used to build a query that will return an entity
+        --Node, Relationship-- by its id. It will create a query that looks
+        like:
+
+            MATCH ()-[r0]-() WHERE id(r0) = $r0_id_0 RETURN DISTINCT r
+
+        for relationships OR for nodes
+
+            MATCH (n0) WHERE id(n0) = $n0_id_0 RETURN DISTINCT n0
+        '''
+        if not entity.id and id_val:
+            entity.id = id_val
+
+        self._entity_by_id_builder(entity)
+
+        self.pypher.MATCH(*self.matches).WHERE(*self.wheres)
+        returns = map(__.DISTINCT, self.returns)
+        self.pypher.RETURN(*returns)
+
+        return str(self.pypher), self.pypher.bound_params
+
+
 class RelationshipQuery(_BaseQuery):
 
     def __init__(self, mapper, direction='out', relationship_entity=None,
@@ -331,10 +362,10 @@ class RelationshipQuery(_BaseQuery):
             qv = self.start_entity.query_variable
             where = __.ID(qv) == self.start_entity.id
 
-            self.pypher.NODE(qv)
+            self.pypher.MATCH.NODE(qv)
             self.wheres.append(where)
         else:
-            self.pypher.NODE(labels=self.start_entity.labels)
+            self.pypher.MATCH.NODE(labels=self.start_entity.labels)
 
         return self
 
