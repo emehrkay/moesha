@@ -85,7 +85,7 @@ class MapperTests(unittest.TestCase):
         mapper = Mapper(TC)
         my_mapper = mapper.get_mapper(node)
 
-        self.assertEqual(my_mapper.__class__.__name__, 'EntityMapper')
+        self.assertEqual(my_mapper.__class__.__name__, 'EntityNodeMapper')
 
     def test_can_create_generic_node(self):
         mapper = Mapper(TC)
