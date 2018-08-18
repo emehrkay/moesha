@@ -1,9 +1,7 @@
 """
-Pypher
+Moesha
 ------
 
-Pypher is graph abstraction layer that converts Python objects
-to Cypher strings complete with bound parameters.
 """
 import sys
 from setuptools import setup, find_packages
@@ -16,10 +14,10 @@ install_requires = [
 exec(open('moesha/version.py').read())
 
 setup(
-    name = 'python_cypher',
+    name = 'moesha',
     packages = find_packages(),
     version = __version__,
-    description = 'Python Neo4J OGM',
+    description = '',
     url = 'https://github.com/emehrkay/moesha',
     author = 'Mark Henderson',
     author_email = 'emehrkay@gmail.com',
