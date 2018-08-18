@@ -13,19 +13,19 @@ install_requires = [
 ]
 
 # get the version information
-exec(open('neomapper/version.py').read())
+exec(open('moesha/version.py').read())
 
 setup(
     name = 'python_cypher',
     packages = find_packages(),
     version = __version__,
     description = 'Python Neo4J OGM',
-    url = 'https://github.com/emehrkay/neomapper',
+    url = 'https://github.com/emehrkay/moesha',
     author = 'Mark Henderson',
     author_email = 'emehrkay@gmail.com',
     long_description = __doc__,
     install_requires = install_requires,
     classifiers = [
     ],
-    test_suite = 'neomapper.test',
+    test_suite = 'moesha.test',
 )

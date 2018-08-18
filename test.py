@@ -1,7 +1,7 @@
-from neomapper.entity import Node, ENTITY_MAP
-from neomapper.mapper import Mapper, Relationship, get_mapper, EntityMapper, RelatedEntity
-from neomapper.property import *
-from neomapper.connection import Connection
+from moesha.entity import Node, ENTITY_MAP
+from moesha.mapper import Mapper, Relationship, get_mapper, EntityMapper, RelatedEntity
+from moesha.property import *
+from moesha.connection import Connection
 
 
 
