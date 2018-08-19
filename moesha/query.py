@@ -204,35 +204,16 @@ class Query(_BaseQuery):
 
             self.wheres.append(__.ID(entity.query_variable) == _id)
             self._update_properties(entity)
+            self.matches.append(rel)
         else:
             rel.rel(entity.query_variable, labels=entity.label,
                 direction='out', **props)
+            self.creates.append(rel)
 
         if end.id:
             update_node(end, rel)
         else:
             create_node(end, rel)
-
-        if entity.id:
-            self.matches.append(rel)
-        else:
-            self.creates.append(rel)
-
-
-        # if entity.id is None:
-        #
-        # else:
-        #     _id = VM.get_next(entity, 'id')
-        #     _id = Param(_id, entity.id)
-        #     rel = __.append(start)
-        #     # rel = __.node(start.query_variable, **start_properties)
-        #     rel.rel(entity.query_variable, labels=entity.label,
-        #         direction='out')
-        #     # rel.node(end.query_variable, **end_properties)
-        #     rel.append(end)
-        #     rel.WHERE(__.ID(entity.query_variable) == _id)
-        #     self._update_properties(entity)
-        #     self.matches.append(rel)
 
         self.returns.append(entity.query_variable)
 
