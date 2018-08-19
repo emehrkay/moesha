@@ -140,7 +140,7 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper(EntityMapper):
             entity = MyNode
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated
 
         mn = mapper.create(entity=MyNode)
@@ -164,7 +164,7 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper1(EntityMapper):
             entity = MyNode1
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated
 
         mn = mapper.create(entity=MyNode1)
@@ -188,10 +188,10 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper2(EntityMapper):
             entity = MyNode2
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated_before
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated_after
 
         mn = mapper.create(entity=MyNode2)
@@ -284,10 +284,10 @@ class MapperTests(unittest.TestCase):
             def on_after_delete(self, entity, response):
                 self.after_delete = self.deleted_after
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated_before
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated_after
 
         mn = mapper.create(entity=MyNode4)

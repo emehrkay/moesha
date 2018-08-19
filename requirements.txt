@@ -1,1 +1,10 @@
 asyncbolt==0.0.2
+neo4j==1.7.0b1
+neobolt==1.7.0b1
+neotime==1.0.0
+pudb==2018.1
+Pygments==2.2.0
+-e git+https://github.com/emehrkay/Pypher.git@57a3d2220498901e1ca3733fd9523bb05ca3ef91#egg=python_cypher
+pytz==2018.5
+six==1.11.0
+urwid==2.0.1

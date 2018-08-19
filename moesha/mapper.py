@@ -43,28 +43,29 @@ def get_mapper(entity, mapper):
 
 
 class EntityQueryVariable(object):
-    storage = {}
+    counts = {
+        'n': 0,
+        'r': 0,
+    }
 
     @classmethod
     def define(cls, entity):
         if hasattr(entity, 'query_variable') and entity.query_variable:
             return entity.query_variable
 
-        name = entity_name(entity)
-
-        if name not in cls.storage:
-            cls.storage[name] = 0
-
-        var = 'n' if isinstance(entity, Node) else 'r'
-        var = '{}{}'.format(var, cls.storage[name])
-        cls.storage[name] += 1
+        t_var = 'n' if isinstance(entity, Node) else 'r'
+        var = '{}{}'.format(t_var, cls.counts[t_var])
+        cls.counts[t_var] += 1
         entity.query_variable = var
 
         return var
 
     @classmethod
     def reset(cls):
-        cls.storage = {}
+        cls.counts = {
+            'n': 0,
+            'r': 0,
+        }
 
 
 EQV = EntityQueryVariable
@@ -274,6 +275,12 @@ class EntityMapper(with_metaclass(_RootMapper)):
             else:
                 entity = Node(id=id, properties=properties, labels=label)
 
+        if start:
+            entity.start = start
+
+        if end:
+            entity.end = end
+
         return entity
 
     def save(self, entity):
@@ -306,6 +313,8 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 EQV.define(start)
                 EQV.define(end)
 
+                # self.mapper.save(start)
+                # self.mapper.save(end)
                 start_mapper = get_mapper(entity=start, mapper=self.mapper)
                 end_mapper = get_mapper(entity=end, mapper=self.mapper)
 
@@ -327,19 +336,6 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 transaction['action'] = '_create_relationship'
         else:
             raise MapperException('NOT ALLOWED')
-
-        # ensure that the entity is updated with the newest data after the
-        # queries are run
-        def ensure_udpate(response):
-            for res in response.result_data:
-                for var, node in res.items():
-                    if var == entity.query_variable:
-                        entity.id = node.id
-                        properties = {k:v for k,v  in node.items()}
-
-                        entity.hydrate(**properties)
-
-        self.after_events.append(ensure_udpate)
 
         EQV.define(entity)
         unit = _Unit(**transaction)
@@ -381,14 +377,37 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save()
 
+    def apply_cleanup(self, entity):
+
+        def cleanup(*args, **kwargs):
+            self.reset()
+
+        self.after_events.append(cleanup)
+
+        return self
+
     def apply_create(self, entity):
-        before = partial(self.on_before_save, entity=entity)
-        after = partial(self.on_after_save, entity=entity)
+        before = partial(self.on_before_create, entity=entity)
+        after = partial(self.on_after_create, entity=entity)
 
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        # ensure that the entity is updated with the newest data after the
+        # queries are run and its query_variable is nullified
+        def ensure_udpate(response):
+            for res in response.result_data:
+                for var, node in res.items():
+                    if var == entity.query_variable:
+                        entity.query_variable = None
+                        entity.id = node.id
+                        properties = {k:v for k,v  in node.items()}
+
+                        entity.hydrate(**properties)
+
+        self.after_events.insert(0, ensure_udpate)
+
+        return self.apply_cleanup(entity)
 
     def apply_update(self, entity):
         before = partial(self.on_before_update, entity=entity)
@@ -397,7 +416,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        return self.apply_cleanup(entity)
 
     def apply_delete(self, entity):
         before = partial(self.on_before_delete, entity=entity)
@@ -406,12 +425,12 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        return self.apply_cleanup(entity)
 
-    def on_before_save(self, entity):
+    def on_before_create(self, entity):
         pass
 
-    def on_after_save(self, entity, response=None):
+    def on_after_create(self, entity, response=None):
         pass
 
     def on_before_update(self, entity):
@@ -534,12 +553,14 @@ class Mapper(object):
         if pypher:
             query = str(pypher)
             params = pypher.bound_params
-
+        print(query)
+        print(params)
         params = params or {}
         res = self.connection.query(query=query, params=params)
         response = Response(mapper=self, data=res.data)
 
         self._execute_after(res)
+        self.reset()
 
         return response
 
