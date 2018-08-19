@@ -46,6 +46,9 @@ class _BaseQuery(object):
         self.wheres = []
         self.returns = []
         self.pypher = Pypher(params=params)
+        self.matched_entities = []
+        self.wheres_entities = []
+        self.returns_entities = []
 
     def _node_by_id(self, entity):
         qv = entity.query_variable
@@ -75,10 +78,29 @@ class _BaseQuery(object):
         where = __.ID(qv) == _id
 
         self.matches.append(node)
-        self.wheres.append(where)
-        self.returns.append(entity.query_variable)
+
+        if entity not in self.wheres_entities:
+            self.wheres.append(where)
+
+            self.wheres_entities.append(entity)
+
+        if entity not in self.returns_entities:
+            self.returns.append(entity.query_variable)
+
+            self.returns_entities.append(entity)
 
         return self
+
+    def where_builder(self):
+        wb = __()
+
+        for i, where in enumerate(self.wheres):
+            if i == 0:
+                wb = where
+            else:
+                wb.AND(where)
+
+        return wb
 
 
 class Query(_BaseQuery):
@@ -104,14 +126,18 @@ class Query(_BaseQuery):
         pypher = self.pypher
 
         if self.matches:
-            for match in self.matches:
-                pypher.MATCH(match)
+            pypher.MATCH(*self.matches)
 
         if self.creates:
             pypher.CREATE(*self.creates)
 
         if self.sets:
             pypher.SET(*self.sets)
+
+        if self.wheres:
+            wb = self.where_builder()
+
+            self.pypher.WHERE(wb)
 
         pypher.RETURN(*self.returns)
 
@@ -122,7 +148,11 @@ class Query(_BaseQuery):
         create = __.node(entity.query_variable, labels=entity.label, **props)
 
         self.creates.append(create)
-        self.returns.append(entity.query_variable)
+
+        if entity not in self.returns_entities:
+            self.returns.append(entity.query_variable)
+
+            self.returns_entities.append(entity)
 
         return self
 
@@ -130,13 +160,15 @@ class Query(_BaseQuery):
         props = self._properties(entity)
         qv = entity.query_variable
 
-        for field, value in props.items():
-            stmt = getattr(__, qv).property(field)._
-            stmt == value
-            self.sets.append(stmt)
+        if entity not in self.matched_entities:
+            for field, value in props.items():
+                stmt = getattr(__, qv).property(field)._
+                stmt == value
+                self.sets.append(stmt)
 
-        self.matches.append(self._node_by_id(entity))
-        self.returns.append(qv)
+            self.matched_entities.append(entity)
+
+        self._entity_by_id_builder(entity)
 
         return self
 
@@ -162,39 +194,24 @@ class Query(_BaseQuery):
         VM.set_query_var(end)
         VM.set_query_var(entity)
 
-        def create_node(entity, rel):
-            props = self._properties(entity)
-            create = rel.node(entity.query_variable, labels=entity.label,
-                **props)
-
-            self.returns.append(entity.query_variable)
-
-            return create
-
-        def update_node(entity, rel):
-            props = self._properties(entity)
-            qv = entity.query_variable
-
-            for field, value in props.items():
-                stmt = getattr(__, qv).property(field)._
-                stmt == value
-                self.sets.append(stmt)
-
-            self.returns.append(qv)
-
-            by_id = self._node_by_id(entity)
-            self.matches.append(by_id)
-            rel.node(entity.query_variable)
-
         """build final query could be a combination of queries:
         @todo: document potential queries
         """
         rel = __()
 
         if start.id:
-            update_node(start, rel)
+            self.update_node(start)
+            self.matches.pop()
+            rel.node(start.query_variable)
         else:
-            create_node(start, rel)
+            self.create_node(start)
+            rel = self.creates.pop()
+
+        if end.id:
+            self.update_node(end)
+            self.matches.pop()
+        else:
+            self.create_node(end)
 
         if entity.id:
             _id = VM.get_next(entity, 'id')
@@ -211,11 +228,14 @@ class Query(_BaseQuery):
             self.creates.append(rel)
 
         if end.id:
-            update_node(end, rel)
+            rel.node(end.query_variable)
         else:
-            create_node(end, rel)
+            rel.append(self.creates.pop(0))
 
-        self.returns.append(entity.query_variable)
+        if entity not in self.returns_entities:
+            self.returns.append(entity.query_variable)
+
+            self.returns_entities.append(entity)
 
         return self
 
@@ -312,7 +332,12 @@ class Helpers(_BaseQuery):
 
         self._entity_by_id_builder(entity)
 
-        self.pypher.MATCH(*self.matches).WHERE(*self.wheres)
+        self.pypher.MATCH(*self.matches)
+
+        wb = self.where_builder()
+
+        self.pypher.WHERE(wb)
+
         returns = map(__.DISTINCT, self.returns)
         self.pypher.RETURN(*returns)
 
@@ -423,7 +448,9 @@ class RelationshipQuery(_BaseQuery):
         self._build_start()._build_relationship()._build_end()
 
         if self.wheres:
-            self.pypher.WHERE(*self.wheres)
+            wb = self.where_builder()
+
+            self.pypher.WHERE(wb)
 
         self.pypher.RETURN(*self.returns)
 
