@@ -43,28 +43,29 @@ def get_mapper(entity, mapper):
 
 
 class EntityQueryVariable(object):
-    storage = {}
+    counts = {
+        'n': 0,
+        'r': 0,
+    }
 
     @classmethod
     def define(cls, entity):
         if hasattr(entity, 'query_variable') and entity.query_variable:
             return entity.query_variable
 
-        name = entity_name(entity)
-
-        if name not in cls.storage:
-            cls.storage[name] = 0
-
-        var = 'n' if isinstance(entity, Node) else 'r'
-        var = '{}{}'.format(var, cls.storage[name])
-        cls.storage[name] += 1
+        t_var = 'n' if isinstance(entity, Node) else 'r'
+        var = '{}{}'.format(t_var, cls.counts[t_var])
+        cls.counts[t_var] += 1
         entity.query_variable = var
 
         return var
 
     @classmethod
     def reset(cls):
-        cls.storage = {}
+        cls.counts = {
+            'n': 0,
+            'r': 0,
+        }
 
 
 EQV = EntityQueryVariable
@@ -231,9 +232,8 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.mapper = mapper
         self.before_events = []
         self.after_events = []
-        self._build_relationships_()
-        self._property_changes = {}
         self._entity_context = None
+        self._build_relationships_()
 
     def reset(self):
         self.before_events = []
@@ -274,9 +274,17 @@ class EntityMapper(with_metaclass(_RootMapper)):
             else:
                 entity = Node(id=id, properties=properties, labels=label)
 
+        if start:
+            entity.start = start
+
+        if end:
+            entity.end = end
+
         return entity
 
     def save(self, entity):
+        self.mapper.remove_entity_unit(entity)
+
         exists = bool(entity.id)
         transaction = {
             'entity': entity,
@@ -328,19 +336,6 @@ class EntityMapper(with_metaclass(_RootMapper)):
         else:
             raise MapperException('NOT ALLOWED')
 
-        # ensure that the entity is updated with the newest data after the
-        # queries are run
-        def ensure_udpate(response):
-            for res in response.result_data:
-                for var, node in res.items():
-                    if var == entity.query_variable:
-                        entity.id = node.id
-                        properties = {k:v for k,v  in node.items()}
-
-                        entity.hydrate(**properties)
-
-        self.after_events.append(ensure_udpate)
-
         EQV.define(entity)
         unit = _Unit(**transaction)
         self.mapper.add_unit(unit)
@@ -381,37 +376,71 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save()
 
+    def apply_cleanup(self, entity):
+
+         def cleanup(*args, **kwargs):
+             print("MAPPER RESET")
+             self.reset()
+
+         self.after_events.append(cleanup)
+
+         return self
+
     def apply_create(self, entity):
-        before = partial(self.on_before_save, entity=entity)
-        after = partial(self.on_after_save, entity=entity)
+        if self.mapper.entity_used(entity):
+            return self
+        from .util import entity_name
+        print('$$$$$$$apply create', entity_name(entity))
+        before = partial(self.on_before_create, entity=entity)
+        after = partial(self.on_after_create, entity=entity)
 
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        # ensure that the entity is updated with the newest data after the
+        # queries are run and its query_variable is nullified
+        def ensure_udpate(response):
+            for res in response.result_data:
+                for var, node in res.items():
+                    if var == entity.query_variable:
+                        entity.query_variable = None
+                        entity.id = node.id
+                        properties = {k:v for k,v  in node.items()}
+
+                        entity.hydrate(**properties)
+
+        self.after_events.insert(0, ensure_udpate)
+
+        return self.apply_cleanup(entity)
 
     def apply_update(self, entity):
+        if self.mapper.entity_used(entity):
+            return self
+
         before = partial(self.on_before_update, entity=entity)
         after = partial(self.on_after_update, entity=entity)
 
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        return self.apply_cleanup(entity)
 
     def apply_delete(self, entity):
+        if self.mapper.entity_used(entity):
+            return self
+
         before = partial(self.on_before_delete, entity=entity)
         after = partial(self.on_after_delete, entity=entity)
 
         self.before_events.append(before)
         self.after_events.append(after)
 
-        return self
+        return self.apply_cleanup(entity)
 
-    def on_before_save(self, entity):
+    def on_before_create(self, entity):
         pass
 
-    def on_after_save(self, entity, response=None):
+    def on_after_create(self, entity, response=None):
         pass
 
     def on_before_update(self, entity):
@@ -474,6 +503,25 @@ class Mapper(object):
         EQV.reset()
         self.params.reset()
 
+    def entity_used(self, entity):
+        for u in self.units:
+            if u.entity == entity:
+                return True
+
+        return False
+
+    def remove_entity_unit(self, entity):
+        index = None
+
+        for i, u in enumerate(self.units):
+            if u.entity == entity:
+                index = i
+                print('removing', u)
+        if index is not None:
+            del self.units[i]
+
+        return self
+
     def add_unit(self, unit):
         self.units.append(unit)
 
@@ -528,6 +576,8 @@ class Mapper(object):
         for query in queries:
             response += self.query(query=query, params=params).data
 
+        self.reset()
+
         return response
 
     def query(self, pypher=None, query=None, params=None):
@@ -535,6 +585,8 @@ class Mapper(object):
             query = str(pypher)
             params = pypher.bound_params
 
+        from .util import _query_debug
+        print(_query_debug(query, params))
         params = params or {}
         res = self.connection.query(query=query, params=params)
         response = Response(mapper=self, data=res.data)

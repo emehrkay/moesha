@@ -120,7 +120,8 @@ class Query(_BaseQuery):
     def create_node(self, entity):
         props = self._properties(entity)
 
-        self.creates.append(__.node(entity.query_variable, **props))
+        self.creates.append(__.node(entity.query_variable, labels=entity.label,
+            **props))
         self.returns.append(entity.query_variable)
 
         return self
@@ -161,6 +162,8 @@ class Query(_BaseQuery):
         VM.set_query_var(end)
         VM.set_query_var(entity)
 
+        rel = Pypher()
+
         if start not in self.matched_entities:
             if start.id is not None:
                 self._update_properties(start)
@@ -182,18 +185,41 @@ class Query(_BaseQuery):
             self.returns.append(end.query_variable)
 
         if entity.id is None:
-            rel = __.node(start.query_variable, **start_properties)
+            if start.id:
+                rel = rel.node(start.query_variable)
+            else:
+                rel = rel.node(start.query_variable, labels=start.label,
+                    **start_properties)
+
             rel.rel(entity.query_variable, labels=entity.label,
                 direction='out', **props)
-            rel.node(end.query_variable, **end_properties)
+
+            if end.id:
+                rel.node(end.query_variable)
+            else:
+                rel.node(end.query_variable, labels=end.label,
+                    **end_properties)
+
             self.creates.append(rel)
         else:
             _id = VM.get_next(entity, 'id')
             _id = Param(_id, entity.id)
-            rel = __.node(start.query_variable, **start_properties)
+
+            if start.id:
+                rel = rel.node(start.query_variable)
+            else:
+                rel = rel.node(start.query_variable, labels=start.label,
+                    **start_properties)
+
             rel.rel(entity.query_variable, labels=entity.label,
                 direction='out')
-            rel.node(end.query_variable, **end_properties)
+
+            if end.id:
+                rel.node(end.query_variable)
+            else:
+                rel.node(end.query_variable, labels=end.label,
+                    **end_properties)
+
             rel.WHERE(__.ID(entity.query_variable) == _id)
             self._update_properties(entity)
             self.matches.append(rel)
