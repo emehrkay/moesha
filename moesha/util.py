@@ -35,3 +35,21 @@ def entity_name(entity):
     else:
         return '{}.{}'.format(entity.__class__.__module__,
             entity.__class__.__name__)
+
+
+def _query_debug(query, params):
+    from string import Template
+
+    if not params:
+        return query
+
+    temp = Template(query)
+    fixed = {}
+
+    for k, v in params.items():
+        if isinstance(v, str):
+            v = "'{}'".format(v) if v else ''
+
+        fixed[k] = v
+
+    return temp.substitute(**fixed)
