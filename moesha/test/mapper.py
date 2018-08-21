@@ -140,7 +140,7 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper(EntityMapper):
             entity = MyNode
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated
 
         mn = mapper.create(entity=MyNode)
@@ -148,12 +148,13 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_save = 'BEFOERESAVE'
         my_mapper.updated = 'UDPATED{}'.format(random())
         mapper.save(mn)
-        query, params = mapper.prepare()
+
+        queries = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.before_save, my_mapper.updated)
-        self.assertEqual(1, len(query))
-        self.assertIn('CREATE', query[0])
+        self.assertEqual(1, len(queries))
+        self.assertIn('CREATE', queries[0][0])
 
     def test_can_create_after_save_event_custom(self):
         mapper = Mapper(TC)
@@ -164,7 +165,7 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper1(EntityMapper):
             entity = MyNode1
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated
 
         mn = mapper.create(entity=MyNode1)
@@ -172,12 +173,12 @@ class MapperTests(unittest.TestCase):
         my_mapper.after_save = 'AFTERESAVE'
         my_mapper.updated = 'UDPATED{}'.format(random())
         mapper.save(mn)
-        query, params = mapper.prepare()
+        queries = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated)
-        self.assertEqual(1, len(query))
-        self.assertIn('CREATE', query[0])
+        self.assertEqual(1, len(queries))
+        self.assertIn('CREATE', queries[0][0])
 
     def test_can_create_before_and_after_save_event_custom(self):
         mapper = Mapper(TC)
@@ -188,10 +189,10 @@ class MapperTests(unittest.TestCase):
         class MyNodeMapper2(EntityMapper):
             entity = MyNode2
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated_before
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated_after
 
         mn = mapper.create(entity=MyNode2)
@@ -201,13 +202,13 @@ class MapperTests(unittest.TestCase):
         my_mapper.updated_before = 'UDPATED{}'.format(random())
         my_mapper.updated_after = 'UDPATED{}'.format(random())
         mapper.save(mn)
-        query, params = mapper.prepare()
+        query = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
         self.assertEqual(my_mapper.before_save, my_mapper.updated_before)
         self.assertEqual(1, len(query))
-        self.assertIn('CREATE', query[0])
+        self.assertIn('CREATE', query[0][0])
 
     def test_can_create_before_and_after_update_events_custom(self):
         mapper = Mapper(TC)
@@ -231,13 +232,13 @@ class MapperTests(unittest.TestCase):
         my_mapper.updated_before = 'UDPATED{}'.format(random())
         my_mapper.updated_after = 'UDPATED{}'.format(random())
         mapper.save(mn)
-        query, params = mapper.prepare()
+        query = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.after_update, my_mapper.updated_after)
         self.assertEqual(my_mapper.before_update, my_mapper.updated_before)
         self.assertEqual(1, len(query))
-        self.assertIn('MATCH', query[0])
+        self.assertIn('MATCH', query[0][0])
 
     def test_can_create_before_and_after_delete_events_custom(self):
         mapper = Mapper(TC)
@@ -261,13 +262,13 @@ class MapperTests(unittest.TestCase):
         my_mapper.deleted_before = 'UDPATED{}'.format(random())
         my_mapper.deleted_after = 'UDPATED{}'.format(random())
         mapper.delete(mn)
-        query, params = mapper.prepare()
+        query = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.after_delete, my_mapper.deleted_after)
         self.assertEqual(my_mapper.before_delete, my_mapper.deleted_before)
         self.assertEqual(1, len(query))
-        self.assertIn('MATCH', query[0])
+        self.assertIn('MATCH', query[0][0])
 
     def test_can_create_before_and_after_delete_and_save_events_custom(self):
         mapper = Mapper(TC)
@@ -284,10 +285,10 @@ class MapperTests(unittest.TestCase):
             def on_after_delete(self, entity, response):
                 self.after_delete = self.deleted_after
 
-            def on_before_save(self, entity):
+            def on_before_create(self, entity):
                 self.before_save = self.updated_before
 
-            def on_after_save(self, entity, response):
+            def on_after_create(self, entity, response):
                 self.after_save = self.updated_after
 
         mn = mapper.create(entity=MyNode4)
@@ -305,7 +306,7 @@ class MapperTests(unittest.TestCase):
         my_mapper.deleted_before = 'UDPATED{}'.format(random())
         my_mapper.deleted_after = 'UDPATED{}'.format(random())
         mapper.delete(mn)
-        query, params = mapper.prepare()
+        query = mapper.queries()
         mapper.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
@@ -313,8 +314,8 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(my_mapper.after_delete, my_mapper.deleted_after)
         self.assertEqual(my_mapper.before_delete, my_mapper.deleted_before)
         self.assertEqual(2, len(query))
-        self.assertIn('CREATE', query[0])
-        self.assertIn('MATCH', query[1])
+        self.assertIn('CREATE', query[0][0])
+        self.assertIn('MATCH', query[1][0])
 
 
 class MapperCreateTests(unittest.TestCase):
@@ -333,11 +334,12 @@ class MapperCreateTests(unittest.TestCase):
         n = Node(properties=p)
 
         self.mapper.save(n)
-        queries, params = self.mapper.prepare()
+        queries = self.mapper.queries()
+        query, params = queries[0]
 
         self.assertEqual(1, len(params))
         self.assertEqual(1, len(queries))
-        self.assertTrue(queries[0].startswith('CREATE'))
+        self.assertTrue(query.startswith('CREATE'))
 
     def test_mapper_can_create_multiple_nodes(self):
         name = 'mark {}'.format(random())
@@ -350,13 +352,12 @@ class MapperCreateTests(unittest.TestCase):
         self.mapper.save(n2)
         self.mapper.save(n3)
 
-        queries, params = self.mapper.prepare()
+        queries = self.mapper.queries()
 
-        self.assertEqual(1, len(params))
         self.assertEqual(3, len(queries))
 
         for query in queries:
-            self.assertTrue(query.startswith('CREATE'))
+            self.assertTrue(query[0].startswith('CREATE'))
 
     def test_can_create_single_relationship(self):
         p = {'name': 'somename'}
@@ -365,12 +366,11 @@ class MapperCreateTests(unittest.TestCase):
         rel = Relationship(start=start, end=end)
 
         self.mapper.save(rel)
-        query, params = self.mapper.prepare()
+        queries = self.mapper.queries()
 
-        self.assertEqual(1, len(query))
-        self.assertEqual(1, len(params))
-        self.assertTrue(query[0].startswith('CREATE'))
-        self.assertTrue('RETURN' in query[0])
+        self.assertEqual(1, len(queries))
+        self.assertTrue(queries[0][0].startswith('CREATE'))
+        self.assertTrue('RETURN' in queries[0][0])
 
 
 class MapperUpdateTests(unittest.TestCase):
@@ -385,11 +385,12 @@ class MapperUpdateTests(unittest.TestCase):
         n['name'] = name
 
         self.mapper.save(n)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
+        params = query[0][1]
 
         self.assertEqual(1, len(query))
         self.assertEqual(2, len(params))
-        self.assertIn('SET', query[0])
+        self.assertIn('SET', query[0][0])
         self.assertIn(name, params.values())
         self.assertIn(id, params.values())
 
@@ -406,16 +407,15 @@ class MapperUpdateTests(unittest.TestCase):
 
         self.mapper.save(n)
         self.mapper.save(n2)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(2, len(query))
-        self.assertEqual(4, len(params))
-        self.assertIn('SET', query[0])
-        self.assertIn('SET', query[1])
-        self.assertIn(name, params.values())
-        self.assertIn(id, params.values())
-        self.assertIn(name2, params.values())
-        self.assertIn(id2, params.values())
+        self.assertIn('SET', query[0][0])
+        self.assertIn('SET', query[1][0])
+        self.assertIn(name, query[0][1].values())
+        self.assertIn(id, query[0][1].values())
+        self.assertIn(name2, query[1][1].values())
+        self.assertIn(id2, query[1][1].values())
 
     def test_can_update_single_relationship(self):
         id = 999
@@ -431,16 +431,15 @@ class MapperUpdateTests(unittest.TestCase):
         rel = Relationship(start=n, end=n2, id=rid)
 
         self.mapper.save(rel)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(1, len(query))
-        self.assertEqual(5, len(params))
-        self.assertIn('SET', query[0])
-        self.assertIn(name, params.values())
-        self.assertIn(id, params.values())
-        self.assertIn(name2, params.values())
-        self.assertIn(id2, params.values())
-        self.assertIn(rid, params.values())
+        self.assertIn('SET', query[0][0])
+        self.assertIn(name, query[0][1].values())
+        self.assertIn(id, query[0][1].values())
+        self.assertIn(name2, query[0][1].values())
+        self.assertIn(id2, query[0][1].values())
+        self.assertIn(rid, query[0][1].values())
 
     def test_can_update_multiple_relationships(self):
         id = 999
@@ -469,19 +468,18 @@ class MapperUpdateTests(unittest.TestCase):
 
         self.mapper.save(rel)
         self.mapper.save(rel2)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(2, len(query))
-        self.assertEqual(10, len(params))
-        self.assertIn('SET', query[0])
-        self.assertIn(name, params.values())
-        self.assertIn(id, params.values())
-        self.assertIn(name2, params.values())
-        self.assertIn(id3, params.values())
-        self.assertIn(rid, params.values())
-        self.assertIn(id4, params.values())
-        self.assertIn(name3, params.values())
-        self.assertIn(name4, params.values())
+        self.assertIn('SET', query[0][0])
+        self.assertIn(name, query[0][1].values())
+        self.assertIn(id, query[0][1].values())
+        self.assertIn(name2, query[0][1].values())
+        self.assertIn(id3, query[1][1].values())
+        self.assertIn(rid, query[0][1].values())
+        self.assertIn(id4, query[1][1].values())
+        self.assertIn(name3, query[1][1].values())
+        self.assertIn(name4, query[1][1].values())
 
 
 class MapperDeleteTests(unittest.TestCase):
@@ -493,11 +491,11 @@ class MapperDeleteTests(unittest.TestCase):
         _id = 999
         n = Node(id=_id)
         self.mapper.delete(n)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(1, len(query))
-        self.assertEqual(1, len(params))
-        self.assertTrue('DETACH DELETE' in query[0])
+        self.assertEqual(1, len(query[0][1]))
+        self.assertTrue('DETACH DELETE' in query[0][0])
 
     def test_can_delete_multiple_nodes(self):
         _id = 999
@@ -506,13 +504,14 @@ class MapperDeleteTests(unittest.TestCase):
         n2 = Node(id=_id2)
         self.mapper.delete(n)
         self.mapper.delete(n2)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(2, len(query))
-        self.assertEqual(2, len(params))
+        self.assertEqual(1, len(query[0][1]))
+        self.assertEqual(1, len(query[1][1]))
 
         for q in query:
-            self.assertTrue('DETACH DELETE' in q)
+            self.assertTrue('DETACH DELETE' in q[0])
 
     def test_can_delete_single_relationship(self):
         _id = 999
@@ -522,11 +521,11 @@ class MapperDeleteTests(unittest.TestCase):
         _id3 = 8989
         rel = Relationship(start=n, end=n2, id=_id3)
         self.mapper.delete(rel)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(1, len(query))
-        self.assertEqual(1, len(params))
-        self.assertTrue('DELETE' in query[0])
+        self.assertEqual(1, len(query[0][1]))
+        self.assertTrue('DELETE' in query[0][0])
 
     def test_can_delete_multiple_relationships(self):
         _id = 999
@@ -543,13 +542,14 @@ class MapperDeleteTests(unittest.TestCase):
         _id4 = 9991
         rel2 = Relationship(start=nn, end=nn2, id=_id4)
         self.mapper.delete(rel).delete(rel2)
-        query, params = self.mapper.prepare()
+        query = self.mapper.queries()
 
         self.assertEqual(2, len(query))
-        self.assertEqual(2, len(params))
+        self.assertEqual(1, len(query[0][1]))
+        self.assertEqual(1, len(query[1][1]))
 
         for q in query:
-            self.assertTrue('DELETE' in q)
+            self.assertTrue('DELETE' in q[0])
 
 # TODO move to integration testing
 # class MapperBuilderTests(unittest.TestCase):
