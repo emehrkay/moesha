@@ -610,6 +610,11 @@ class Mapper(object):
     def send(self):
         response = Response(mapper=self)
 
+        """each unit will be processed, its before events executed, then the
+        actual query will be run, and the after and final events will be run.
+        If the unit's entity is a relationship, the start and end entities
+        will have their before events run instantly and their after and final 
+        events appended to the unit's"""
         for unit in self.units:
             unit.prepare()
             unit.execute_before_events()
