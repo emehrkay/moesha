@@ -185,7 +185,7 @@ class Query(_BaseQuery):
             self.returns.append(end.query_variable)
 
         if entity.id is None:
-            if start.id:
+            if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
                 rel = rel.node(start.query_variable, labels=start.label,
@@ -194,7 +194,7 @@ class Query(_BaseQuery):
             rel.rel(entity.query_variable, labels=entity.label,
                 direction='out', **props)
 
-            if end.id:
+            if end.id is not None:
                 rel.node(end.query_variable)
             else:
                 rel.node(end.query_variable, labels=end.label,
@@ -205,7 +205,7 @@ class Query(_BaseQuery):
             _id = VM.get_next(entity, 'id')
             _id = Param(_id, entity.id)
 
-            if start.id:
+            if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
                 rel = rel.node(start.query_variable, labels=start.label,
@@ -214,7 +214,7 @@ class Query(_BaseQuery):
             rel.rel(entity.query_variable, labels=entity.label,
                 direction='out')
 
-            if end.id:
+            if end.id is not None:
                 rel.node(end.query_variable)
             else:
                 rel.node(end.query_variable, labels=end.label,

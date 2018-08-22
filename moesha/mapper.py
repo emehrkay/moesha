@@ -399,12 +399,12 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 start_mapper = get_mapper(entity=start, mapper=self.mapper)
                 end_mapper = get_mapper(entity=end, mapper=self.mapper)
 
-                if start.id:
+                if start.id is not None:
                     start_events = start_mapper._event_map[EntityMapper.UPDATE]
                 else:
                     start_events = start_mapper._event_map[EntityMapper.CREATE]
 
-                if end.id:
+                if end.id is not None:
                     end_events = end_mapper._event_map[EntityMapper.UPDATE]
                 else:
                     end_events = end_mapper._event_map[EntityMapper.CREATE]
