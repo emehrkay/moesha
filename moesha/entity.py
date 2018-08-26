@@ -89,7 +89,7 @@ class Entity(with_metaclass(_Entity)):
     __LABELS__ = None
 
     def __init__(self, data_type='python', labels=None, id=None,
-                 properties=None):
+                 properties=None, loaded_from_source=False):
         self._build_properties(data_type=data_type)
         self._data_type = 'python'
         self.data_type = data_type
@@ -100,6 +100,9 @@ class Entity(with_metaclass(_Entity)):
         properties = properties or {}
 
         self.force_hydrate(**properties)
+
+        if loaded_from_source:
+            self.properties.set_changed(False)
 
     def safely_stringify_for_pudb(self):
         return None
@@ -183,9 +186,10 @@ class Relationship(Entity):
     __ALLOW_UNDEFINED__ = True
 
     def __init__(self, data_type='python', labels=None, id=None, start=None,
-                 end=None, properties=None):
+                 end=None, properties=None, loaded_from_source=False):
         super(Relationship, self).__init__(data_type=data_type, labels=labels,
-            id=id, properties=properties)
+            id=id, properties=properties,
+            loaded_from_source=loaded_from_source)
         self.start = start
         self.end = end
 

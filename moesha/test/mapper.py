@@ -481,6 +481,103 @@ class MapperUpdateTests(unittest.TestCase):
         self.assertIn(name3, query[1][1].values())
         self.assertIn(name4, query[1][1].values())
 
+    def test_can_see_single_property_changes(self):
+        mapper = Mapper(TC)
+        before_value = 'before'
+        after_value = 'after {}'.format(random())
+        properties = {'name': before_value}
+        changed_props = {}
+
+        class MyNodex(Node):
+            __PROPERTIES__ = {
+                'name': String()
+            }
+
+
+        class MyNodeMapperx(EntityMapper):
+            entity = MyNodex
+
+            def on_name_property_changed(self, entity, field, value_from, value_to):
+                changed_props[field] = value_to
+
+        n = MyNodex(id=999, properties=properties, loaded_from_source=True)
+        n['name'] = after_value
+
+        self.mapper.save(n).send()
+
+        self.assertEqual(1, len(changed_props))
+        self.assertIn('name', changed_props)
+        self.assertEqual(changed_props['name'], n['name'])
+
+    def test_can_see_single_property_with_weird_name_changes(self):
+        mapper = Mapper(TC)
+        before_value = 'before'
+        after_value = 'after {}'.format(random())
+        prop_name = 'some--weird!!   name'
+        properties = {prop_name: before_value}
+        changed_props = {}
+
+        class MyNodexy(Node):
+            __PROPERTIES__ = {
+                prop_name: String()
+            }
+
+
+        class MyNodeMapperxy(EntityMapper):
+            entity = MyNodexy
+
+            def __init__(self, mapper):
+                super(MyNodeMapperxy, self).__init__(mapper)
+                self._property_change_handlers[prop_name] = self.on_weird_property_changed
+
+            def on_weird_property_changed(self, entity, field, value_from, value_to):
+                changed_props[field] = value_to
+
+        n = MyNodexy(id=999, properties=properties, loaded_from_source=True)
+        n[prop_name] = after_value
+
+        self.mapper.save(n).send()
+
+        self.assertEqual(1, len(changed_props))
+        self.assertIn(prop_name, changed_props)
+        self.assertEqual(changed_props[prop_name], n[prop_name])
+
+    def test_can_see_multiple_properties_changes(self):
+        mapper = Mapper(TC)
+        before_value = 'before'
+        after_value = 'after {}'.format(random())
+        after_age_value = 'age {}'.format(random())
+        properties = {'name': before_value, 'age': 1}
+        changed_props = {}
+
+        class MyNodexx(Node):
+            __PROPERTIES__ = {
+                'name': String(),
+                'age': Integer()
+            }
+
+
+        class MyNodeMapperxx(EntityMapper):
+            entity = MyNodexx
+
+            def on_name_property_changed(self, entity, field, value_from, value_to):
+                changed_props[field] = value_to
+
+            def on_age_property_changed(self, entity, field, value_from, value_to):
+                changed_props[field] = value_to
+
+        n = MyNodexx(id=999, properties=properties, loaded_from_source=True)
+        n['name'] = after_value
+        n['age'] = after_age_value
+
+        self.mapper.save(n).send()
+
+        self.assertEqual(2, len(changed_props))
+        self.assertIn('name', changed_props)
+        self.assertIn('age', changed_props)
+        self.assertEqual(changed_props['name'], n['name'])
+        self.assertEqual(changed_props['age'], n['age'])
+
 
 class MapperDeleteTests(unittest.TestCase):
 

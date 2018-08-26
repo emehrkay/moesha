@@ -6,7 +6,7 @@ from six import with_metaclass
 
 from pypher.builder import Pypher, Params
 
-from neo4j import v1
+from neo4j.v1 import types
 
 from .entity import (Node, StructuredNode, Relationship,
     StructuredRelationship, get_entity, Collection)
@@ -131,7 +131,7 @@ class RelatedEntity(object):
         return self
 
     def __call__(self, limit=None, skip=None):
-        unit = _Unit(entity=self.mapper.entity_context, action='query',
+        unit = _Unit(entity=self.mapper.entity_context, action=self.query,
             mapper=self, limit=limit, skip=skip)
 
         return self.mapper.mapper.add_unit(unit).send()
@@ -218,7 +218,7 @@ class _Unit(object):
         kwargs = {'unit': self}
         kwargs.update(self.kwargs)
 
-        self.query, self.params = getattr(self.mapper, self.action)(**kwargs)
+        self.query, self.params = self.action(**kwargs)
 
     def execute_before_events(self):
         for event in self.before_events:
@@ -280,6 +280,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.after_events = []
         self._entity_context = None
         self._build_relationships_()
+        self._property_change_handlers = {}
         self._event_map = {
             self.CREATE: {
                 'before': [self.on_before_create,],
@@ -287,7 +288,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
             },
             self.UPDATE: {
                 'before': [self.on_before_update,],
-                'after': [self.on_after_update,],
+                'after': [self.on_properties_changed, self.on_after_update,],
             },
             self.DELETE: {
                 'before': [self.on_before_delete,],
@@ -323,7 +324,8 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return entity.data
 
     def create(self, id=None, entity=None, properties=None, label=None,
-               start=None, end=None, entity_type='node'):
+               start=None, end=None, entity_type='node',
+               loaded_from_source=False):
         properties = properties or {}
 
         if label and not entity:
@@ -333,13 +335,16 @@ class EntityMapper(with_metaclass(_RootMapper)):
             entity = self.entity
 
         try:
-            entity = entity(id=id, properties=properties)
+            entity = entity(id=id, properties=properties,
+                loaded_from_source=loaded_from_source)
         except:
             if entity_type == 'relationship':
                 entity = Relationship(id=id, labels=label,
-                    properties=properties, start=start, end=end)
+                    properties=properties, start=start, end=end,
+                    loaded_from_source=loaded_from_source)
             else:
-                entity = Node(id=id, properties=properties, labels=label)
+                entity = Node(id=id, properties=properties, labels=label,
+                    loaded_from_source=loaded_from_source)
 
         if start:
             entity.start = start
@@ -352,14 +357,14 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def save(self, entity):
         EQV.define(entity)
 
-        unit = _Unit(entity=entity, action='_save_entity', mapper=self,
+        unit = _Unit(entity=entity, action=self._save_entity, mapper=self,
             event_map=self._event_map)
         self.mapper.add_unit(unit)
 
         return self
 
     def delete(self, entity, detach=True):
-        unit = _Unit(entity=entity, action='_delete_entity', mapper=self,
+        unit = _Unit(entity=entity, action=self._delete_entity, mapper=self,
             detach=detach, event_map=self._event_map)
 
         self.mapper.add_unit(unit)
@@ -508,27 +513,47 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def on_after_delete(self, entity, response=None):
         pass
 
+    def on_properties_changed(self, entity, response=None):
+        """This method checkes for changes in the entity's properties and will
+        run a method that will handle what should happen if it changed.
+        for most properties, naming a method with the format
+        `on_$property_changed` should be fine. But for property names that 
+        would not translate to a Python function name, the EntityMapper must
+        modify the _property_change_handlers attribute where the key is the
+        property name and the value is the name of the method that will handle
+        it"""
+        changes = entity.changed
+
+        for field, values in changes.items():
+            method = self._property_change_handlers.get(field, None)
+
+            if not method:
+                method_name = 'on_{}_property_changed'.format(field)
+
+                if hasattr(self, method_name):
+                    method = getattr(self, method_name)
+
+            if method:
+                method(entity=entity, field=field,
+                    value_from=values['from'], value_to=values['to'])
+
     # Utility methods
     def get_by_id(self, id_val=None):
-        '''This method will return an entity by id. It does not attempt to
-        cast the resulting node into the type that the current EntityMapper
-        handles, but will return whatever entity belongs to the id_val'''
-        unit = _Unit(entity=self.entity(), action='_get_by_id', mapper=self,
+        def _get_by_id(unit, id_val=None):
+            helpers = Helpers()
+
+            return helpers.get_by_id(entity=unit.entity, id_val=id_val)
+
+        unit = _Unit(entity=self.entity, action=_get_by_id, mapper=self,
             id_val=id_val, event_map=self._event_map)
         self.mapper.add_unit(unit)
-        query, params = self.mapper.prepare()
-        result = self.mapper.query(query=query[0], params=params)
+        result = self.mapper.send()
 
         if len(result) > 1:
             err = ('There was more than one result for id: {}'.format(id_val))
             raise MapperException(err)
 
         return result[0] if len(result) else None
-
-    def _get_by_id(self, entity, id_val=None):
-        helpers = Helpers()
-
-        return helpers.get_by_id(entity=entity, id_val=id_val)
 
 
 class EntityNodeMapper(EntityMapper):
@@ -594,11 +619,14 @@ class Mapper(object):
 
         return mapper.data(entity)
 
-    def save(self, entity):
-        self.remove_entity_unit(entity)
-        mapper = self.get_mapper(entity)
+    def save(self, *entities):
+        for entity in entities:
+            self.remove_entity_unit(entity)
+            mapper = self.get_mapper(entity)
 
-        return mapper.save(entity)
+            mapper.save(entity)
+
+        return self
 
     def delete(self, entity, detach=True):
         mapper = self.get_mapper(entity=entity)
@@ -606,11 +634,13 @@ class Mapper(object):
         return mapper.delete(entity, detach=detach)
 
     def create(self, id=None, entity=None, properties=None, label=None,
-               entity_type='node', start=None, end=None):
+               entity_type='node', start=None, end=None,
+               loaded_from_source=False):
         mapper = self.get_mapper(entity=entity)
 
         return mapper.create(id=id, entity=entity, properties=properties,
-            label=label, entity_type=entity_type, start=start, end=end)
+            label=label, entity_type=entity_type, start=start, end=end,
+            loaded_from_source=loaded_from_source)
 
     def get_by_id(self, entity=None, id_val=None):
         entity = entity or Node
@@ -669,14 +699,16 @@ class Response(Collection):
     def __init__(self, mapper, response=None):
         self.mapper = mapper
         self.response = response
+        self._data = response.data if response else []
         super(Response, self).__init__()
 
-    @property
-    def data(self):
-        try:
-            return self.response.data
-        except:
-            return []
+    def _get_data(self):
+        return self._data
+
+    def _set_data(self, data):
+        self._data = data
+
+    data = property(_get_data, _set_data)
 
     def __len__(self):
         return len(self.data)
@@ -690,22 +722,24 @@ class Response(Collection):
                 start = None
                 end = None
                 entity_type = 'node'
+                labels = data.labels
 
-                if isinstance(data, v1.Relationship):
+                if isinstance(data, types.Relationship):
                     entity_type = 'relationship'
                     start = data.start
                     end = data.end
+                    labels = data.type
 
-                entity = self.mapper.create(id=data.id,
-                    properties=data.properties, entity_type=entity_type,
-                    start=start, end=end)
+                entity = self.mapper.create(id=data.id, label=list(labels),
+                    properties=data._properties, entity_type=entity_type,
+                    start=start, end=end, loaded_from_source=True)
 
                 self.entities.append(entity)
 
                 return entity
             except Exception as e:
                 self.index = 0
-                raise StopIteration()
+                raise StopIteration(e)
 
     def __iadd__(self, other):
         if isinstance(other, Response):

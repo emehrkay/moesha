@@ -58,19 +58,23 @@ class _BaseQuery(object):
 
         return __.node(qv).WHERE(__.ID(qv) == _id)
 
-    def _entity_by_id_builder(self, entity):
+    def _entity_by_id_builder(self, entity, id_val, add_labels=False):
         qv = entity.query_variable
 
         if not qv:
             qv = VM.set_query_var(entity)
 
         _id = VM.get_next(entity, 'id')
-        _id = Param(_id, entity.id)
+        _id = Param(_id, id_val)
+        node_kwargs = {}
+
+        if add_labels:
+            node_kwargs['labels'] = entity.labels
 
         if isinstance(entity, Relationship):
-            node = __.node().relationship(qv).node()
+            node = __.node(**node_kwargs).relationship(qv).node()
         else:
-            node = __.node(qv)
+            node = __.node(qv, **node_kwargs)
 
         where = __.ID(qv) == _id
 
@@ -310,16 +314,18 @@ class Helpers(_BaseQuery):
         --Node, Relationship-- by its id. It will create a query that looks
         like:
 
-            MATCH ()-[r0]-() WHERE id(r0) = $r0_id_0 RETURN DISTINCT r
+            MATCH ()-[r0:`Labels`]-() WHERE id(r0) = $r0_id_0 RETURN DISTINCT r
 
         for relationships OR for nodes
 
-            MATCH (n0) WHERE id(n0) = $n0_id_0 RETURN DISTINCT n0
+            MATCH (n0:`Labels`) WHERE id(n0) = $n0_id_0 RETURN DISTINCT n0
         '''
         if not entity.id and id_val:
-            entity.id = id_val
+            entity.id = int(id_val)
 
-        self._entity_by_id_builder(entity)
+        VM.set_query_var(entity)
+
+        self._entity_by_id_builder(entity, int(id_val), True)
 
         self.pypher.MATCH(*self.matches).WHERE(*self.wheres)
         returns = map(__.DISTINCT, self.returns)

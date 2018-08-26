@@ -125,6 +125,13 @@ class PropertyManager(object):
 
         return OrderedDict(sorted(changed.items()))
 
+    def set_changed(self, changed=False):
+        for name, prop in self.properties.items():
+            prop.changed = changed
+            prop.original_value = prop._value
+
+        return self
+
 
 class Property(object):
     default = None
