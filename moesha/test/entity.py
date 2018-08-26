@@ -14,7 +14,7 @@ class TestNode(Node):
 
 
 class TesLabeldtNode(Node):
-    _LABELS = 'TEST_LABEL_NODE'
+    __LABELS__ = 'TEST_LABEL_NODE'
 
 
 class Test_Unlabeled_Node(Node):
@@ -30,7 +30,7 @@ class EntityTests(unittest.TestCase):
 
     def test_can_create_entity_and_remove_pre_defined_attributes(self):
         class X(Node):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'eye_id': Integer(),
                 'age': Integer(),
             }
@@ -76,7 +76,7 @@ class EntityTests(unittest.TestCase):
         l = ['One', 'TWO', 'ABC']
 
         class StaticNode(Node):
-            _LABELS = l
+            __LABELS__ = l
 
         exp = 'StaticNode'
         labels = StaticNode.labels
@@ -108,25 +108,25 @@ class EntityTests(unittest.TestCase):
         _label = 'SOME LABEL'
 
         class One(Node):
-            _ALLOW_UNDEFINED = True
-            PROPERTIES = {
+            __ALLOW_UNDEFINED__ = True
+            __PROPERTIES__ = {
                 'name': String()
             }
 
         class Two(One):
-            _LABELS = [_label]
-            PROPERTIES = {
+            __LABELS__ = [_label]
+            __PROPERTIES__ = {
                 'age': Integer()
             }
 
         class TwoTwo(One):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'location': String()
             }
 
         class Three(Two, TwoTwo):
-            _ALLOW_UNDEFINED = False
-            PROPERTIES = {
+            __ALLOW_UNDEFINED__ = False
+            __PROPERTIES__ = {
                 'sex': String()
             }
 
@@ -143,25 +143,25 @@ class EntityTests(unittest.TestCase):
         _label = 'SOME LABEL'
 
         class One(Node):
-            _ALLOW_UNDEFINED = True
-            PROPERTIES = {
+            __ALLOW_UNDEFINED__ = True
+            __PROPERTIES__ = {
                 'name': String()
             }
 
         class Two(One):
-            _LABELS = [_label]
-            PROPERTIES = {
+            __LABELS__ = [_label]
+            __PROPERTIES__ = {
                 'age': Integer()
             }
 
         class TwoTwo(One):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'location': String()
             }
 
         class Three(Two, TwoTwo):
-            _ALLOW_UNDEFINED = False
-            PROPERTIES = {
+            __ALLOW_UNDEFINED__ = False
+            __PROPERTIES__ = {
                 'sex': String()
             }
 
@@ -215,7 +215,7 @@ class EntityTests(unittest.TestCase):
 
     def test_can_delete_defined_field(self):
         class X(StructuredNode):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'name': String()
             }
 
@@ -242,7 +242,7 @@ class EntityTests(unittest.TestCase):
 
     def test_can_force_hyrdate_defined_fields(self):
         class X(StructuredNode):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'time': TimeStamp()
             }
 
@@ -255,7 +255,7 @@ class EntityTests(unittest.TestCase):
 
     def test_cannot_hyrdate_defined_fields(self):
         class X(StructuredNode):
-            PROPERTIES = {
+            __PROPERTIES__ = {
                 'time': TimeStamp()
             }
 

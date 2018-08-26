@@ -319,12 +319,18 @@ class EntityMapper(with_metaclass(_RootMapper)):
     entity_context = property(_get_entity_context, _set_entity_context,
         _delete_entity_context)
 
+    def data(self, entity):
+        return entity.data
+
     def create(self, id=None, entity=None, properties=None, label=None,
                start=None, end=None, entity_type='node'):
         properties = properties or {}
 
         if label and not entity:
             entity = get_entity(label)
+
+        if not entity:
+            entity = self.entity
 
         try:
             entity = entity(id=id, properties=properties)
@@ -582,6 +588,11 @@ class Mapper(object):
 
     def get_mapper(self, entity):
         return get_mapper(entity=entity, mapper=self)
+
+    def data(self, entity):
+        mapper = self.get_mapper(entity)
+
+        return mapper.data(entity)
 
     def save(self, entity):
         self.remove_entity_unit(entity)

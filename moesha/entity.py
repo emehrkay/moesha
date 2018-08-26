@@ -27,7 +27,7 @@ def get_entity(label=None):
 class _Entity(type):
 
     def __new__(cls, name, bases, attrs):
-        """Inherit the Property objects, _ALLOW_UNDEFINED, and _LABELS
+        """Inherit the Property objects, __ALLOW_UNDEFINED__, and __LABELS__
         attributes from the bases"""
         glob = {
             'allow_undefined': None,
@@ -37,13 +37,13 @@ class _Entity(type):
 
 
         def get_props(source):
-            if '_ALLOW_UNDEFINED' in source:
-                glob['allow_undefined'] = bool(source.get('_ALLOW_UNDEFINED'))
+            if '__ALLOW_UNDEFINED__' in source:
+                glob['allow_undefined'] = bool(source.get('__ALLOW_UNDEFINED__'))
 
-            if '_LABELS' in source:
-                glob['labels'] = source.get('_LABELS', None)
+            if '__LABELS__' in source:
+                glob['labels'] = source.get('__LABELS__', None)
 
-            props = source.get('PROPERTIES', {})
+            props = source.get('__PROPERTIES__', {})
 
             properties.update(props)
 
@@ -86,14 +86,14 @@ class _Entity(type):
 
 
 class Entity(with_metaclass(_Entity)):
-    _LABELS = None
+    __LABELS__ = None
 
     def __init__(self, data_type='python', labels=None, id=None,
                  properties=None):
         self._build_properties(data_type=data_type)
         self._data_type = 'python'
         self.data_type = data_type
-        self.label = labels or self._LABELS
+        self.label = labels or self.__LABELS__
         self._id = None
         self.id = id
         self.query_variable = None
@@ -115,9 +115,9 @@ class Entity(with_metaclass(_Entity)):
     data_type = property(_get_data_type, _set_data_type)
 
     def _get_labels(self):
-        self._LABELS.sort()
+        self.__LABELS__.sort()
 
-        return self._LABELS
+        return self.__LABELS__
 
     def _set_labels(self, label):
         if not label:
@@ -128,7 +128,7 @@ class Entity(with_metaclass(_Entity)):
 
         label.sort()
 
-        self._LABELS = label
+        self.__LABELS__ = label
 
         return self
 
@@ -172,15 +172,15 @@ class Entity(with_metaclass(_Entity)):
 
 
 class Node(Entity):
-    _ALLOW_UNDEFINED = True
+    __ALLOW_UNDEFINED__ = True
 
 
 class StructuredNode(Node):
-    _ALLOW_UNDEFINED = False
+    __ALLOW_UNDEFINED__ = False
 
 
 class Relationship(Entity):
-    _ALLOW_UNDEFINED = True
+    __ALLOW_UNDEFINED__ = True
 
     def __init__(self, data_type='python', labels=None, id=None, start=None,
                  end=None, properties=None):
@@ -202,7 +202,7 @@ class Relationship(Entity):
 
 
 class StructuredRelationship(Relationship):
-    _ALLOW_UNDEFINED = False
+    __ALLOW_UNDEFINED__ = False
 
 
 class Collection(object):
