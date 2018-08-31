@@ -1,0 +1,248 @@
+import copy
+
+from six import with_metaclass
+
+from .property import (PropertyManager, Property)
+from .util import (normalize_labels, entity_name, entity_to_labels)
+
+
+
+ENTITY_MAP = {}
+
+
+def get_entity(label=None):
+    label = label or []
+
+    if not isinstance(label, (list, set, tuple)):
+        label = [label,]
+
+    label = normalize_labels(*label)
+
+    if label in ENTITY_MAP:
+        return ENTITY_MAP[label]
+
+    return Node
+
+
+class _Entity(type):
+
+    def __new__(cls, name, bases, attrs):
+        """Inherit the Property objects, __ALLOW_UNDEFINED__, and __LABELS__
+        attributes from the bases"""
+        glob = {
+            'allow_undefined': None,
+            'labels': None,
+        }
+        properties = {}
+
+
+        def get_props(source):
+            if '__ALLOW_UNDEFINED__' in source:
+                glob['allow_undefined'] = bool(source.get('__ALLOW_UNDEFINED__'))
+
+            if '__LABELS__' in source:
+                glob['labels'] = source.get('__LABELS__', None)
+
+            props = source.get('__PROPERTIES__', {})
+
+            properties.update(props)
+
+
+        def walk(bases):
+            walk_bases = list(bases)
+
+            walk_bases.reverse()
+
+            for wb in walk_bases:
+                walk(wb.__bases__)
+
+            [get_props(b.__dict__) for b in walk_bases]
+
+
+        walk(bases)
+        get_props(attrs)
+
+        def build_properties(self, data_type):
+            props = {n: copy.deepcopy(p) for n, p in properties.items()}
+            self.properties = PropertyManager(properties=props,
+                allow_undefined=glob['allow_undefined'], data_type=data_type)
+
+
+        cls = super(_Entity, cls).__new__(cls, name, bases, attrs)
+
+        if glob['labels']:
+            if not isinstance(glob['labels'], (list, tuple, set)):
+                glob['labels'] = [glob['labels'],]
+
+            labels = normalize_labels(*glob['labels'])
+        else:
+            labels = entity_to_labels(cls)
+
+        ENTITY_MAP[labels] = cls
+        setattr(cls, '_build_properties', build_properties)
+        setattr(cls, 'labels', labels.split(':'))
+
+        return cls
+
+
+class Entity(with_metaclass(_Entity)):
+    __LABELS__ = None
+
+    def __init__(self, data_type='python', labels=None, id=None,
+                 properties=None, loaded_from_source=False):
+        self._build_properties(data_type=data_type)
+        self._data_type = 'python'
+        self.data_type = data_type
+        self.label = labels or self.__LABELS__
+        self._id = None
+        self.id = id
+        self.query_variable = None
+        properties = properties or {}
+
+        self.force_hydrate(**properties)
+
+        if loaded_from_source:
+            self.properties.set_changed(False)
+
+    def safely_stringify_for_pudb(self):
+        return None
+
+    def _get_data_type(self):
+        return self.properties.data_type
+
+    def _set_data_type(self, data_type):
+        self.properties.data_type = data_type
+
+        return self
+
+    data_type = property(_get_data_type, _set_data_type)
+
+    def _get_labels(self):
+        self.__LABELS__.sort()
+
+        return self.__LABELS__
+
+    def _set_labels(self, label):
+        if not label:
+            label = entity_to_labels(self).split(':')
+
+        if not isinstance(label, (list, set, tuple)):
+            label = [label,]
+
+        label.sort()
+
+        self.__LABELS__ = label
+
+        return self
+
+    label = property(_get_labels, _set_labels)
+
+    def _get_id(self):
+        return self._id
+
+    def _set_id(self, id):
+        if not self._id:
+            self._id = id
+
+    id = property(_get_id, _set_id)
+
+    def hydrate(self, **properties):
+        self.properties.hydrate(**properties)
+
+        return self
+
+    def force_hydrate(self, **properties):
+        self.properties.force_hydrate(**properties)
+
+        return self
+
+    def __getitem__(self, field):
+        return self.properties[field]
+
+    def __setitem__(self, field, value):
+        self.properties[field] = value
+
+    def __delitem__(self, field):
+        del(self.properties[field])
+
+    @property
+    def data(self):
+        return self.properties.data
+
+    @property
+    def changed(self):
+        return self.properties.changed
+
+
+class Node(Entity):
+    __ALLOW_UNDEFINED__ = True
+
+
+class StructuredNode(Node):
+    __ALLOW_UNDEFINED__ = False
+
+
+class Relationship(Entity):
+    __ALLOW_UNDEFINED__ = True
+
+    def __init__(self, data_type='python', labels=None, id=None, start=None,
+                 end=None, properties=None, loaded_from_source=False):
+        super(Relationship, self).__init__(data_type=data_type, labels=labels,
+            id=id, properties=properties,
+            loaded_from_source=loaded_from_source)
+        self.start = start
+        self.end = end
+
+    def _get_labels(self):
+        labels = super(Relationship, self)._get_labels()
+
+        return labels[0]
+
+    def _set_labels(self, label):
+        return super(Relationship, self)._set_labels(label)
+
+    label = property(_get_labels, _set_labels)
+    type = property(_get_labels, _set_labels)
+
+
+class StructuredRelationship(Relationship):
+    __ALLOW_UNDEFINED__ = False
+
+
+class Collection(object):
+
+    def __init__(self, entities=None):
+        if entities and not isinstance(entities, (list, set, tuple)):
+            entities = [entities,]
+        elif isinstance(entities, Collection):
+            entities = entities.entities
+
+        self.entities = entities or []
+        self.index = 0
+
+    def __getitem__(self, field):
+        return [entity[field] for entity in self]
+
+    def __setitem__(self, field, value):
+        for entity in self:
+            entity[field] = value
+
+        return self
+
+    def __delitem__(self, field):
+        for entity in self:
+            del(entity[field])
+
+        return self
+
+    def __iter__(self):
+        return self
+    
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        entity = self[self.index]
+        self.index += 1
+
+        return entity

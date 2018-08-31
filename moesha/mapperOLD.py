@@ -238,7 +238,7 @@ class _RootMapper(type):
     def __new__(cls, name, bases, attrs):
         relationships = {}
 
-        for n, rel in attrs.get('__RELATIONSHIPS__', []):
+        for n, rel in attrs.items():
             if isinstance(rel, RelatedEntity):
                 relationships[n] = rel
 
@@ -273,11 +273,6 @@ class EntityMapper(with_metaclass(_RootMapper)):
     UPDATE = 'update'
     DELETE = 'delete'
     FINAL = 'final'
-    __PROPERTIES__ = {}
-    __RELATIONSHIPS__ = {}
-    __PRIMARY_KEY__ = 'id'
-    __ALLOW_UNDEFINED__ = False
-    __PROPERTY_MAPPINGS__ = {}
 
     def __init__(self, mapper=None):
         self.mapper = mapper
