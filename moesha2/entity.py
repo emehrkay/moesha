@@ -3,15 +3,25 @@ import copy
 
 class _Entity(object):
 
-    def __init__(self, pk=None, properties=None):
+    def __init__(self, id=None, properties=None):
         properties = properties or {}
-        self.pk = pk
-        self.hydrate(**properties)
+        self.id = id
+        self.data = {}
+        self.initial = {}
         self.changes = {}
 
-    def hydrate(self, **kwargs):
-        self.data = copy.copy(kwargs)
-        self.initial = copy.copy(kwargs)
+        self.hydrate(properties=properties, reset=True)
+
+    def hydrate(self, properties=None, reset=False):
+        properties = properties or {}
+
+        if reset:
+            self.data = copy.copy(properties)
+            self.initial = copy.copy(properties)
+        else:
+            self.data.update(properties)
+
+        return self
 
     def __getitem__(self, name):
         return self.data.get(name, None)

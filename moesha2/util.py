@@ -1,0 +1,55 @@
+import re
+
+
+__normal = re.compile('[\W_]+')
+
+
+def normalize(string):
+    return __normal.sub('', string.lower())
+
+
+def entity_to_labels(entity):
+    if isinstance(entity, type):
+        name = entity.__name__
+    else:
+        name = entity.__class__.__name__
+
+    parts = name.strip('_').split('_')
+
+    return normalize_labels(*parts)
+
+
+def normalize_labels(*labels):
+    if not labels:
+        return ''
+
+    labels = list(labels)
+    labels.sort()
+
+    return ':'.join(labels)
+
+
+def entity_name(entity):
+    if isinstance(entity, type):
+        return '{}.{}'.format(entity.__module__, entity.__name__)
+    else:
+        return '{}.{}'.format(entity.__class__.__module__,
+            entity.__class__.__name__)
+
+
+def _query_debug(query, params):
+    from string import Template
+
+    if not params:
+        return query
+
+    temp = Template(query)
+    fixed = {}
+
+    for k, v in params.items():
+        if isinstance(v, str):
+            v = "'{}'".format(v) if v else ''
+
+        fixed[k] = v
+
+    return temp.substitute(**fixed)
