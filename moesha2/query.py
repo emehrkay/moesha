@@ -2,7 +2,7 @@ import uuid
 
 from pypher import (Pypher, Param, __)
 
-from .entity import (Entity, Node, Relationship, Collection)
+from .entity import (Node, Relationship, Collection)
 from .util import normalize
 
 
@@ -124,8 +124,8 @@ class Query(_BaseQuery):
     def create_node(self, entity):
         props = self._properties(entity)
 
-        self.creates.append(__.node(entity.query_variable, labels=entity.label,
-            **props))
+        self.creates.append(__.node(entity.query_variable,
+            labels=entity.labels, **props))
         self.returns.append(entity.query_variable)
 
         return self
@@ -192,16 +192,16 @@ class Query(_BaseQuery):
             if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
-                rel = rel.node(start.query_variable, labels=start.label,
+                rel = rel.node(start.query_variable, labels=start.labels,
                     **start_properties)
 
-            rel.rel(entity.query_variable, labels=entity.label,
+            rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out', **props)
 
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                rel.node(end.query_variable, labels=end.label,
+                rel.node(end.query_variable, labels=end.labels,
                     **end_properties)
 
             self.creates.append(rel)
@@ -212,16 +212,16 @@ class Query(_BaseQuery):
             if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
-                rel = rel.node(start.query_variable, labels=start.label,
+                rel = rel.node(start.query_variable, labels=start.labels,
                     **start_properties)
 
-            rel.rel(entity.query_variable, labels=entity.label,
+            rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out')
 
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                rel.node(end.query_variable, labels=end.label,
+                rel.node(end.query_variable, labels=end.labels,
                     **end_properties)
 
             rel.WHERE(__.ID(entity.query_variable) == _id)
@@ -272,7 +272,7 @@ class Query(_BaseQuery):
         _id = VM.get_next(entity, 'id')
         _id = Param(_id, entity.id)
         match = __.node()
-        match.rel(entity.query_variable, labels=entity.label)
+        match.rel(entity.query_variable, labels=entity.labels)
         match.node()
         match.WHERE(__.ID(entity.query_variable) == _id)
 
@@ -365,7 +365,7 @@ class RelationshipQuery(_BaseQuery):
         return self._start_entity
 
     def _set_start_entity(self, entity):
-        if entity is not None and not isinstance(entity, Entity):
+        if entity is not None and not isinstance(entity, Node):
             raise
 
         if entity:
@@ -379,7 +379,7 @@ class RelationshipQuery(_BaseQuery):
         return self._end_entity
 
     def _set_end_entity(self, entity):
-        if entity is not None and not isinstance(entity, Entity):
+        if entity is not None and not isinstance(entity, Node):
             raise
 
         if self._end_entity:

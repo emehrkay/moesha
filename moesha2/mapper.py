@@ -1,4 +1,5 @@
 import copy
+import functools
 
 from functools import partial
 
@@ -8,8 +9,9 @@ from pypher.builder import Pypher, Params
 
 from neo4j.v1 import types
 
-from .entity import Node, Relationship
+from .entity import Node, Relationship, Collection
 from .property import PropertyManager
+from .query import (Query, RelationshipQuery, Helpers)
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
@@ -56,6 +58,86 @@ def get_mapper(entity, mapper):
     return mapper
 
 
+class EntityQueryVariable(object):
+    counts = {
+        'n': 0,
+        'r': 0,
+    }
+
+    @classmethod
+    def define(cls, entity):
+        if hasattr(entity, 'query_variable') and entity.query_variable:
+            return entity.query_variable
+
+        t_var = 'n' if isinstance(entity, Node) else 'r'
+        var = '{}{}'.format(t_var, cls.counts[t_var])
+        cls.counts[t_var] += 1
+        entity.query_variable = var
+
+        return var
+
+    @classmethod
+    def reset(cls):
+        cls.counts = {
+            'n': 0,
+            'r': 0,
+        }
+
+
+EQV = EntityQueryVariable
+
+
+class _Unit(object):
+
+    def __init__(self, entity, action, mapper, event_map=None, event=None,
+                 **kwargs):
+        self.entity = entity
+        self.action = action
+        self.mapper = mapper
+        self.event_map = event_map or {}
+        self._event = event
+        self.kwargs = kwargs
+        self.before_events = []
+        self.after_events = []
+        self.final_events = self.event_map.get('final', [])
+        self.query = None
+        self.params = None
+
+    def __repr__(self):
+        return ('<moesha.mapper._Unit at {} for entity: {} at {}>').format(
+            id(self), entity_name(self.entity), id(self.entity))
+
+    def _get_event(self):
+        return self._event
+
+    def _set_event(self, event):
+        self._event = event
+
+        if event in self.event_map:
+            self.before_events = self.event_map[event]['before']
+            self.after_events = self.event_map[event]['after']
+
+    event = property(_get_event, _set_event)
+
+    def prepare(self):
+        kwargs = {'unit': self}
+        kwargs.update(self.kwargs)
+
+        self.query, self.params = self.action(**kwargs)
+
+    def execute_before_events(self):
+        for event in self.before_events:
+            event(self.entity)
+
+    def execute_after_events(self, *args, **kwargs):
+        for event in self.after_events:
+            event(self.entity, *args, **kwargs)
+
+    def execute_final_events(self):
+        for event in self.final_events:
+            event()
+
+
 class _RootMapper(type):
 
     def __new__(cls, name, bases, attrs):
@@ -70,7 +152,6 @@ class _RootMapper(type):
             properties.update(props)
             relationships.update(rels)
 
-
         def walk(bases):
             walk_bases = list(bases)
 
@@ -80,7 +161,6 @@ class _RootMapper(type):
                 walk(wb.__bases__)
 
             [get_props(b.__dict__) for b in walk_bases]
-
 
         walk(bases)
         get_props(attrs)
@@ -128,7 +208,6 @@ class _RootMapper(type):
             ENTITY_MAPPER_MAP[GENERIC_MAPPER] = cls
 
         setattr(cls, '__build__', __build__)
-
 
         return cls
 
@@ -206,24 +285,24 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self.properties.data(entity_data)
 
-    def create(self, id=None, entity=None, properties=None, label=None,
+    def create(self, id=None, entity=None, properties=None, labels=None,
                start=None, end=None, entity_type='node', data_type='python'):
         properties = self.entity_data(properties or {}, data_type=data_type)
 
-        if label and not entity:
-            entity = get_entity(label)
+        if labels and not entity:
+            entity = get_entity(labels)
 
         if not entity:
             entity = self.entity
 
         try:
-            entity = entity(id=id, properties=properties)
+            entity = entity(id=id, properties=properties, labels=labels)
         except:
             if entity_type == 'relationship':
-                entity = Relationship(id=id,
+                entity = Relationship(id=id, labels=labels,
                     properties=properties, start=start, end=end)
             else:
-                entity = Node(id=id, properties=properties)
+                entity = Node(id=id, properties=properties, labels=labels)
 
         if start:
             entity.start = start
@@ -401,7 +480,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         modify the _property_change_handlers attribute where the key is the
         property name and the value is the name of the method that will handle
         it"""
-        changes = entity.changed
+        changes = entity.changes
 
         for field, values in changes.items():
             method = self._property_change_handlers.get(field, None)
@@ -433,6 +512,27 @@ class EntityMapper(with_metaclass(_RootMapper)):
             raise MapperException(err)
 
         return result[0] if len(result) else None
+
+
+class FieldChangeHandler(object):
+
+    def __init__(self, method, *fields):
+        self.method = method
+        self.fields = fields
+        self.assigned = False
+
+    def __get__(self, instance, owner):
+        if not self.assigned:
+            for field in self.fields:
+                instance._property_change_handlers[field] = self.__call__
+
+            self.instance = instance
+            self.assigned = True
+
+        return self.__call__
+
+    def __call__(self, *args, **kwargs):
+        return self.method(self.instance, *args, **kwargs)
 
 
 class Mapper(object):
@@ -504,15 +604,15 @@ class Mapper(object):
 
         return mapper.delete(entity, detach=detach)
 
-    def create(self, id=None, entity=None, properties=None, label=None,
+    def create(self, id=None, entity=None, properties=None, labels=None,
                entity_type='node', start=None, end=None, data_type='python'):
-        if label and not entity:
-            entity = get_entity(label)
+        if labels and not entity:
+            entity = get_entity(labels)
 
         mapper = self.get_mapper(entity=entity)
 
         return mapper.create(id=id, entity=entity, properties=properties,
-            label=label, entity_type=entity_type, start=start, end=end,
+            labels=labels, entity_type=entity_type, start=start, end=end,
             data_type=data_type)
 
     def get_by_id(self, entity=None, id_val=None):
@@ -565,3 +665,62 @@ class Mapper(object):
             queries.append((unit.query, unit.params,))
 
         return queries
+
+class Response(Collection):
+
+    def __init__(self, mapper, response=None):
+        self.mapper = mapper
+        self.response = response
+        self._data = response.data if response else []
+        super(Response, self).__init__()
+
+    def _get_data(self):
+        return self._data
+
+    def _set_data(self, data):
+        self._data = data
+
+    data = property(_get_data, _set_data)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, key):
+        try:
+            return self.entities[key]
+        except Exception as e:
+            try:
+                data = self.data[key]
+                start = None
+                end = None
+                entity_type = 'node'
+                labels = data.labels
+
+                if isinstance(data, types.Relationship):
+                    entity_type = 'relationship'
+                    start = data.start
+                    end = data.end
+                    labels = data.type
+
+                entity = self.mapper.create(id=data.id, label=list(labels),
+                    properties=data._properties, entity_type=entity_type,
+                    start=start, end=end, loaded_from_source=True)
+
+                self.entities.append(entity)
+
+                return entity
+            except Exception as e:
+                self.index = 0
+                raise StopIteration(e)
+
+    def __iadd__(self, other):
+        if isinstance(other, Response):
+            self.data.extend(other.data)
+        else:
+            self.data.extend(other)
+
+        return self
+
+
+class MapperException(Exception):
+    pass

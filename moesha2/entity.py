@@ -1,14 +1,17 @@
 import copy
 
+from .util import entity_to_labels
+
 
 class _Entity(object):
 
-    def __init__(self, id=None, properties=None):
+    def __init__(self, id=None, labels=None, properties=None):
         properties = properties or {}
         self.id = id
         self._data = {}
         self._initial = {}
         self._changes = {}
+        self.labels = labels or []
 
         self.hydrate(properties=properties, reset=True)
 
@@ -19,6 +22,26 @@ class _Entity(object):
     @property
     def changes(self):
         return self._changes
+
+    def _get_labels(self):
+        self._labels.sort()
+
+        return self._labels
+
+    def _set_labels(self, labels):
+        if not labels:
+            labels = entity_to_labels(self).split(':')
+
+        if not isinstance(labels, (list, set, tuple)):
+            labels = [labels,]
+
+        labels.sort()
+
+        self._labels = labels
+
+        return self
+
+    labels = property(_get_labels, _set_labels)
 
     def hydrate(self, properties=None, reset=False):
         properties = properties or {}
@@ -59,10 +82,26 @@ class Node(_Entity):
 
 class Relationship(_Entity):
 
-    def __init__(self, id=None, start=None, end=None, properties=None):
-        super(Relationship, self).__init__(id=id, properties=properties)
+    def __init__(self, id=None, start=None, end=None, properties=None,
+                 labels=None):
+        super(Relationship, self).__init__(id=id, properties=properties,
+            labels=labels)
         self.start = start
         self.end = end
+
+    def _get_labels(self):
+        labels = super(Relationship, self).labels
+
+        return labels[0]
+
+    def _set_labels(self, labels):
+        return super(Relationship, self)._set_labels(labels=labels)
+
+    labels = property(_get_labels, _set_labels)
+
+    @property
+    def type(self):
+        return self.labels
 
 
 class Collection(object):
