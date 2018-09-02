@@ -1,4 +1,5 @@
 import copy
+import functools
 
 from functools import partial
 
@@ -8,9 +9,10 @@ from pypher.builder import Pypher, Params
 
 from neo4j.v1 import types
 
-from .entity import (Node, Relationship, Collection)
+from .entity import Node, Relationship, Collection
+from .property import PropertyManager
 from .query import (Query, RelationshipQuery, Helpers)
-from .util import (entity_name)
+from .util import normalize_labels, entity_name, entity_to_labels
 
 
 GENERIC_MAPPER = 'generic.mapper'
@@ -85,39 +87,6 @@ class EntityQueryVariable(object):
 EQV = EntityQueryVariable
 
 
-class RelatedManager(object):
-
-    def __init__(self, mapper, relationships, allow_undefined=True):
-        self._relationships = {}
-        self.relationships = relationships or {}
-        self.allow_undefined = allow_undefined
-        self.mapper = mapper
-
-    def __call__(self, entity):
-        for _, rel in self.relationships.items():
-            rel.start_entity = entity
-
-        return self
-
-    def _get_relationships(self):
-        return self._relationships
-
-    def _set_relationships(self, relationships=None):
-        self._relationships = relationships or {}
-
-    relationships = property(_get_relationships, _set_relationships)
-
-    def __getitem__(self, name):
-        self.get_relationship(name)
-
-    def get_relationship(self, name):
-        if name in self.relationships:
-            return self.relationships[name]
-
-        if self.allow_undefined:
-            return RelatedEntity(mapper=self.mapper)
-
-
 class _Unit(object):
 
     def __init__(self, entity, action, mapper, event_map=None, event=None,
@@ -173,10 +142,37 @@ class _RootMapper(type):
 
     def __new__(cls, name, bases, attrs):
         relationships = {}
+        properties = {}
+        glob = {'allow_undefined': attrs.get('__ALLOW_UNDEFINED__', False)}
+
+        def get_props(source):
+            props = source.get('__PROPERTIES__', {})
+            rels = source.get('__RELATIONSHIPS__', {})
+
+            properties.update(props)
+            relationships.update(rels)
+
+        def walk(bases):
+            walk_bases = list(bases)
+
+            walk_bases.reverse()
+
+            for wb in walk_bases:
+                walk(wb.__bases__)
+
+            [get_props(b.__dict__) for b in walk_bases]
+
+        walk(bases)
+        get_props(attrs)
 
         for n, rel in attrs.get('__RELATIONSHIPS__', []):
             if isinstance(rel, RelatedEntity):
                 relationships[n] = rel
+
+        def __build__(self):
+            props = {n: copy.deepcopy(p) for n, p in properties.items()}
+            self.properties = PropertyManager(properties=props,
+                allow_undefined=glob['allow_undefined'], data_type='python')
 
         def _build_relationships(self):
             for name, rel in relationships.items():
@@ -186,8 +182,9 @@ class _RootMapper(type):
 
                 setattr(self, name, rel)
 
-            self.relationships = RelatedManager(mapper=self,
-                relationships=relationships)
+            self.relationships = {}
+            # self.relationships = RelatedManager(mapper=self,
+            #     relationships=relationships)
 
         cls = super(_RootMapper, cls).__new__(cls, name, bases, attrs)
         entity = attrs.pop('entity', None)
@@ -195,10 +192,22 @@ class _RootMapper(type):
         if entity:
             map_name = entity_name(entity)
             ENTITY_MAPPER_MAP[map_name] = cls
+
+            labels = attrs.get('__LABELS__', attrs.get('__TYPE__', None))
+
+            if labels:
+                if not isinstance(labels, (list, tuple, set)):
+                    labels = [labels,]
+
+                labels = normalize_labels(*labels)
+            else:
+                labels = entity_to_labels(entity)
+
+            ENTITY_MAP[labels] = entity
         elif name == 'EntityMapper':
             ENTITY_MAPPER_MAP[GENERIC_MAPPER] = cls
 
-        setattr(cls, '_build_relationships_', _build_relationships)
+        setattr(cls, '__build__', __build__)
 
         return cls
 
@@ -220,7 +229,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.before_events = []
         self.after_events = []
         self._entity_context = None
-        self._build_relationships_()
+        self.__build__()
         self._property_change_handlers = {}
         self._event_map = {
             self.CREATE: {
@@ -249,6 +258,16 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
+    def _get_data_type(self):
+        return self.properties.data_type
+
+    def _set_data_type(self, data_type):
+        self.properties.data_type = data_type
+
+        return self
+
+    data_type = property(_get_data_type, _set_data_type)
+
     def _get_entity_context(self):
         return self._entity_context
 
@@ -261,31 +280,29 @@ class EntityMapper(with_metaclass(_RootMapper)):
     entity_context = property(_get_entity_context, _set_entity_context,
         _delete_entity_context)
 
-    def data(self, entity):
-        return entity.data
+    def entity_data(self, entity_data=None, data_type='python'):
+        self.properties.data_type = data_type or self.data_type
 
-    def create(self, id=None, entity=None, properties=None, label=None,
-               start=None, end=None, entity_type='node',
-               loaded_from_source=False):
-        properties = properties or {}
+        return self.properties.data(entity_data)
 
-        if label and not entity:
-            entity = get_entity(label)
+    def create(self, id=None, entity=None, properties=None, labels=None,
+               start=None, end=None, entity_type='node', data_type='python'):
+        properties = self.entity_data(properties or {}, data_type=data_type)
+
+        if labels and not entity:
+            entity = get_entity(labels)
 
         if not entity:
             entity = self.entity
 
         try:
-            entity = entity(id=id, properties=properties,
-                loaded_from_source=loaded_from_source)
+            entity = entity(id=id, properties=properties, labels=labels)
         except:
             if entity_type == 'relationship':
-                entity = Relationship(id=id, labels=label,
-                    properties=properties, start=start, end=end,
-                    loaded_from_source=loaded_from_source)
+                entity = Relationship(id=id, labels=labels,
+                    properties=properties, start=start, end=end)
             else:
-                entity = Node(id=id, properties=properties, labels=label,
-                    loaded_from_source=loaded_from_source)
+                entity = Node(id=id, properties=properties, labels=labels)
 
         if start:
             entity.start = start
@@ -463,7 +480,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         modify the _property_change_handlers attribute where the key is the
         property name and the value is the name of the method that will handle
         it"""
-        changes = entity.changed
+        changes = entity.changes
 
         for field, values in changes.items():
             method = self._property_change_handlers.get(field, None)
@@ -497,12 +514,25 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return result[0] if len(result) else None
 
 
-class EntityNodeMapper(EntityMapper):
-    entity = Node
+class FieldChangeHandler(object):
 
+    def __init__(self, method, *fields):
+        self.method = method
+        self.fields = fields
+        self.assigned = False
 
-class EntityRelationshipMapper(EntityMapper):
-    entity = Relationship
+    def __get__(self, instance, owner):
+        if not self.assigned:
+            for field in self.fields:
+                instance._property_change_handlers[field] = self.__call__
+
+            self.instance = instance
+            self.assigned = True
+
+        return self.__call__
+
+    def __call__(self, *args, **kwargs):
+        return self.method(self.instance, *args, **kwargs)
 
 
 class Mapper(object):
@@ -574,14 +604,16 @@ class Mapper(object):
 
         return mapper.delete(entity, detach=detach)
 
-    def create(self, id=None, entity=None, properties=None, label=None,
-               entity_type='node', start=None, end=None,
-               loaded_from_source=False):
+    def create(self, id=None, entity=None, properties=None, labels=None,
+               entity_type='node', start=None, end=None, data_type='python'):
+        if labels and not entity:
+            entity = get_entity(labels)
+
         mapper = self.get_mapper(entity=entity)
 
         return mapper.create(id=id, entity=entity, properties=properties,
-            label=label, entity_type=entity_type, start=start, end=end,
-            loaded_from_source=loaded_from_source)
+            labels=labels, entity_type=entity_type, start=start, end=end,
+            data_type=data_type)
 
     def get_by_id(self, entity=None, id_val=None):
         entity = entity or Node
@@ -633,7 +665,6 @@ class Mapper(object):
             queries.append((unit.query, unit.params,))
 
         return queries
-
 
 class Response(Collection):
 

@@ -71,22 +71,6 @@ class PropertyTests(unittest.TestCase):
 
         self.assertEqual(i, f.value)
 
-    def test_can_tell_if_property_has_changed(self):
-        v = 'orig{}'.format(random())
-        v2 = 'updated{}'.format(random())
-        f = Property(value=v)
-        f.value = v2
-
-        self.assertTrue(f.changed)
-
-    def test_can_tell_if_property_has_not_changed(self):
-        v = 'orig{}'.format(random())
-        v2 = 'updated{}'.format(random())
-        f = Property(value=v)
-        f.value = v
-
-        self.assertFalse(f.changed)
-
 
 class StringTests(unittest.TestCase):
 
@@ -349,7 +333,7 @@ class PropertyManagerTests(unittest.TestCase):
 
     def test_can_create_a_field_manager_without_fields(self):
         f = PropertyManager()
-        data = f.data
+        data = f.data()
 
         self.assertIsInstance(f, PropertyManager)
         self.assertEqual(0, len(data))
@@ -358,7 +342,7 @@ class PropertyManagerTests(unittest.TestCase):
         string = String()
         fields = {'string': string}
         f = PropertyManager(fields)
-        data = f.data
+        data = f.data()
 
         self.assertIsInstance(f, PropertyManager)
         self.assertEqual(1, len(f.properties))
@@ -370,7 +354,7 @@ class PropertyManagerTests(unittest.TestCase):
         f = PropertyManager(fields)
         v = str(random())
         f['string'] = v
-        data = f.data
+        data = f.data()
 
         self.assertIsInstance(f, PropertyManager)
         self.assertEqual(1, len(f.properties))
@@ -429,81 +413,13 @@ class PropertyManagerTests(unittest.TestCase):
         v2 = random()
         f[k] = v
         f[k2] = v2
-        values = f.data
+        values = f.data()
 
         self.assertEqual(2, len(values))
         self.assertIn(k, values)
         self.assertIn(k2, values)
         self.assertEqual(v, f[k])
         self.assertEqual(v2, f[k2])
-
-    def test_cannot_hydrate_nonexistant_properties(self):
-        v = 9999.0
-        f = {}
-        p = PropertyManager(properties=f)
-        p.hydrate(t=v)
-
-        self.assertNotEqual(v, p['t'])
-
-    def test_can_hydrate_nonexistant_properties(self):
-        v = 9999.0
-        f = {}
-        p = PropertyManager(properties=f, allow_undefined=True)
-        p.hydrate(t=v)
-
-        self.assertEqual(v, p['t'])
-
-    def test_cannot_hydrate_immutable_properties(self):
-        v = 9999.0
-        f = {'t': TimeStamp()}
-        p = PropertyManager(properties=f)
-        p.hydrate(t=v)
-
-        self.assertNotEqual(v, p['t'])
-
-    def test_can_force_hydrate_immutable_properties(self):
-        v = 9999.0
-        f = {'t': TimeStamp()}
-        p = PropertyManager(properties=f)
-        p.force_hydrate(t=v)
-
-        self.assertEqual(v, p['t'])
-
-    def test_can_get_a_list_of_changed_properties(self):
-        p = {
-            'name': String(),
-            'age': Integer(),
-            'location': String()
-        }
-        new_name = 'name {}'.format(random())
-        new_location = 'location {}'.format(random())
-        p = PropertyManager(properties=p)
-        p['name'] = new_name
-        p['location'] = new_location
-        changed = p.changed
-
-        self.assertEqual(2, len(changed))
-        self.assertIn('name', changed)
-        self.assertIn('location', changed)
-
-    def test_can_show_no_changes_after_hydration(self):
-        p = {
-            'name': String(),
-            'age': Integer(),
-            'location': String()
-        }
-        new_name = 'name {}'.format(random())
-        new_location = 'location {}'.format(random())
-        p = PropertyManager(properties=p)
-        p['name'] = new_name
-        p['location'] = new_location
-        p.hydrate(**{
-            'name': 'some name',
-            'location': 'some location'
-        })
-        changed = p.changed
-
-        self.assertEqual(0, len(changed))
 
 
 if __name__ == '__main__':

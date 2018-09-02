@@ -4,8 +4,7 @@ import time
 
 from random import random, randint
 
-from moesha.entity import (Node, StructuredNode, Relationship,
-    StructuredRelationship)
+from moesha.entity import (Node, Relationship)
 from moesha.property import (String, Integer, TimeStamp)
 from moesha.mapper import (Mapper, EntityMapper, get_mapper)
 
@@ -85,7 +84,7 @@ class MapperTests(unittest.TestCase):
         mapper = Mapper(TC)
         my_mapper = mapper.get_mapper(node)
 
-        self.assertEqual(my_mapper.__class__.__name__, 'EntityNodeMapper')
+        self.assertEqual(my_mapper.__class__.__name__, 'EntityMapper')
 
     def test_can_create_generic_node(self):
         mapper = Mapper(TC)
@@ -102,17 +101,22 @@ class MapperTests(unittest.TestCase):
 
         self.assertIsInstance(node, MyNode)
 
-    def test_can_create_custom_node_with_properties(self):
-        class MyNode(Node):
+    def test_can_create_custom_node_with_undefined_properties(self):
+        class MyNodeXXX(Node):
             pass
+
+        class MyNodeXXXMapper(EntityMapper):
+            entity = MyNodeXXX
+            __ALLOW_UNDEFINED__ = True
 
         mapper = Mapper(TC)
         name = 'name{}'.format(random())
         p = {'name': name}
-        node = mapper.create(entity=MyNode, properties=p)
+        
+        node = mapper.create(entity=MyNodeXXX, properties=p)
         data = node.data
 
-        self.assertIsInstance(node, MyNode)
+        self.assertIsInstance(node, MyNodeXXX)
         self.assertEqual(1, len(data))
         self.assertEqual(name, data['name'])
 
@@ -500,7 +504,7 @@ class MapperUpdateTests(unittest.TestCase):
             def on_name_property_changed(self, entity, field, value_from, value_to):
                 changed_props[field] = value_to
 
-        n = MyNodex(id=999, properties=properties, loaded_from_source=True)
+        n = MyNodex(id=999, properties=properties)
         n['name'] = after_value
 
         self.mapper.save(n).send()
@@ -533,7 +537,7 @@ class MapperUpdateTests(unittest.TestCase):
             def on_weird_property_changed(self, entity, field, value_from, value_to):
                 changed_props[field] = value_to
 
-        n = MyNodexy(id=999, properties=properties, loaded_from_source=True)
+        n = MyNodexy(id=999, properties=properties)
         n[prop_name] = after_value
 
         self.mapper.save(n).send()
@@ -566,7 +570,7 @@ class MapperUpdateTests(unittest.TestCase):
             def on_age_property_changed(self, entity, field, value_from, value_to):
                 changed_props[field] = value_to
 
-        n = MyNodexx(id=999, properties=properties, loaded_from_source=True)
+        n = MyNodexx(id=999, properties=properties)
         n['name'] = after_value
         n['age'] = after_age_value
 

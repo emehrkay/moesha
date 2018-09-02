@@ -1,7 +1,7 @@
-from moesha2.entity import Node, Relationship
-from moesha2.mapper import Mapper, get_mapper, EntityMapper
-from moesha2.property import *
-from moesha2.connection import Connection
+from moesha.entity import Node, Relationship
+from moesha.mapper import Mapper, get_mapper, EntityMapper
+from moesha.property import *
+from moesha.connection import Connection
 
 
 

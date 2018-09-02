@@ -1,35 +1,77 @@
 import copy
 
+from .util import entity_to_labels
+
 
 class _Entity(object):
 
-    def __init__(self, pk=None, properties=None):
+    def __init__(self, id=None, labels=None, properties=None):
         properties = properties or {}
-        self.pk = pk
-        self.hydrate(**properties)
-        self.changes = {}
+        self.id = id
+        self._data = {}
+        self._initial = {}
+        self._changes = {}
+        self.labels = labels or []
 
-    def hydrate(self, **kwargs):
-        self.data = copy.copy(kwargs)
-        self.initial = copy.copy(kwargs)
+        self.hydrate(properties=properties, reset=True)
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def changes(self):
+        return self._changes
+
+    def _get_labels(self):
+        self._labels.sort()
+
+        return self._labels
+
+    def _set_labels(self, labels):
+        if not labels:
+            labels = entity_to_labels(self).split(':')
+
+        if not isinstance(labels, (list, set, tuple)):
+            labels = [labels,]
+
+        labels.sort()
+
+        self._labels = labels
+
+        return self
+
+    labels = property(_get_labels, _set_labels)
+
+    def hydrate(self, properties=None, reset=False):
+        properties = properties or {}
+
+        if reset:
+            self._data = copy.copy(properties)
+            self._initial = copy.copy(properties)
+        else:
+            for k, v in properties.items():
+                self[k] = v
+
+        return self
 
     def __getitem__(self, name):
-        return self.data.get(name, None)
+        return self._data.get(name, None)
 
     def __setitem__(self, name, value):
-        if name in self.initial:
-            if value != self.initial[name]:
-                self.changes[name] = {
-                    'from': self.initial[name],
+        if name in self._initial:
+            if value != self._initial[name]:
+                self._changes[name] = {
+                    'from': self._initial[name],
                     'to': value,
                 }
             else:
                 try:
-                    del self.changes[name]
+                    del self._changes[name]
                 except:
                     pass
 
-        self.data[name] = value
+        self._data[name] = value
 
         return self
 
@@ -40,10 +82,26 @@ class Node(_Entity):
 
 class Relationship(_Entity):
 
-    def __init__(self, pk=None, start=None, end=None, properties=None):
-        super(Relationship, self).__init__(pk=pk, properties=properties)
+    def __init__(self, id=None, start=None, end=None, properties=None,
+                 labels=None):
+        super(Relationship, self).__init__(id=id, properties=properties,
+            labels=labels)
         self.start = start
         self.end = end
+
+    def _get_labels(self):
+        labels = super(Relationship, self).labels
+
+        return labels[0]
+
+    def _set_labels(self, labels):
+        return super(Relationship, self)._set_labels(labels=labels)
+
+    labels = property(_get_labels, _set_labels)
+
+    @property
+    def type(self):
+        return self.labels
 
 
 class Collection(object):

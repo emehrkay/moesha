@@ -161,7 +161,7 @@ class RelationshipQueryTests(unittest.TestCase):
         rel = Relationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
-        label = rel.label
+        label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " CREATE ({var})-[{var3}:`{label}` {{`since`: ${since}}}]->({var2})"
@@ -184,7 +184,7 @@ class RelationshipQueryTests(unittest.TestCase):
         rel = Relationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
-        label = rel.label
+        label = rel.type
         exp = ("CREATE ({var}:`Node` {{`name`: ${name}}})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`Node` {{`name`: ${name2}}})"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
                 rel=rel.query_variable, label='Relationship',
@@ -204,7 +204,7 @@ class RelationshipQueryTests(unittest.TestCase):
         rel = Relationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
-        label = rel.label
+        label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " CREATE ({var})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`Node` {{`name`: ${name2}}})"
             " SET {var}.`name` = ${name}"
@@ -231,7 +231,7 @@ class RelationshipQueryTests(unittest.TestCase):
         q = Query([rel, rel2])
         query, params = q.save()
 
-        label = rel.label
+        label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " CREATE ({var})-[{var3}:`{label}` {{`since`: ${since}}}]->({var2}),"
@@ -269,7 +269,7 @@ class RelationshipQueryTests(unittest.TestCase):
         q = Query([rel, rel2])
         query, params = q.save()
 
-        label = rel.label[0]
+        label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var3}) WHERE id({var3}) = ${id3}"
@@ -311,7 +311,7 @@ class RelationshipQueryTests(unittest.TestCase):
         q = Query([rel, rel2])
         query, params = q.save()
 
-        label = rel.label
+        label = rel.type
         exp = ("MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var4}) WHERE id({var4}) = ${id4}"
             " CREATE ({var}:`Node` {{`name`: ${name}}})-[{rel}:`Relationship` {{`since`: ${since}}}]->({var2}),"
@@ -407,7 +407,7 @@ class RelationshipQueryTests(unittest.TestCase):
         query, params = q.delete()
         exp = "MATCH ()-[{var}:`{label}`]-() WHERE id({var}) = ${id} DELETE {var}".format(
             var=rel.query_variable, id=get_dict_key(params, _id3),
-            label=rel.label)
+            label=rel.type)
 
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
@@ -433,9 +433,9 @@ class RelationshipQueryTests(unittest.TestCase):
             " MATCH ()-[{var2}:`{label2}`]-() WHERE id({var2}) = ${id2}"
             " DELETE {var}, {var2}".format(var=rel.query_variable,
             id=get_dict_key(params, _id3),
-            label=rel.label, var2=rel2.query_variable,
+            label=rel.type, var2=rel2.query_variable,
             id2=get_dict_key(params, _id4),
-            label2=rel2.label))
+            label2=rel2.type))
 
         self.assertEqual(exp, query)
         self.assertEqual(2, len(params))
