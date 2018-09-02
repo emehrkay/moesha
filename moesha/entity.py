@@ -141,3 +141,9 @@ class Collection(object):
         self.index += 1
 
         return entity
+
+    def first(self):
+        return self[0]
+
+    def last(self):
+        return self[-1]

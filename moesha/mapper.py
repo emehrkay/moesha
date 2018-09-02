@@ -11,7 +11,7 @@ from neo4j.v1 import types
 
 from .entity import Node, Relationship, Collection
 from .property import PropertyManager
-from .query import (Query, RelationshipQuery, Helpers)
+from .query import (Builder, Query, RelationshipQuery, Helpers)
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
@@ -642,6 +642,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return result[0] if len(result) else None
 
+    def builder(self, entity=None):
+        return Builder(entity or self.entity())
+
 
 class StructuredEntityMapper(EntityMapper):
     __ALLOW_UNDEFINED_PROPERTIES__ = False
@@ -778,6 +781,12 @@ class Mapper(object):
             queries.append((unit.query, unit.params,))
 
         return queries
+
+    def builder(self, entity):
+        mapper = self.get_mapper(mapper)
+
+        return mapper.builder(entity)
+
 
 class Response(Collection):
 
