@@ -161,7 +161,12 @@ class RelatedManager(object):
     relationships = property(_get_relationships, _set_relationships)
 
     def __getitem__(self, name):
-        self.get_relationship(name)
+        if name not in self.relationships and self.allow_undefined:
+            self.relationships[name] = RelatedEntity()
+        else:
+            raise Exception('')
+
+        return self.relationships[name]
 
     def get_relationship(self, name):
         if name in self.relationships:
@@ -376,6 +381,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self.relationships(entity)
 
         return self
+
+    def __getitem__(self, relationship_name):
+        return self.relationships[relationship_name]
 
     def _get_data_type(self):
         return self.properties.data_type

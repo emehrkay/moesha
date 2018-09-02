@@ -478,7 +478,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         
         def get():
             rq.query()
-        
+
         self.assertRaises(RelatedQueryException, get)
 
     def test_can_get_realtionships_for_new_start_node(self):
