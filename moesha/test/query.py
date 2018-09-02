@@ -445,26 +445,27 @@ class RelationshipOutQueryTests(unittest.TestCase):
     direction = 'out'
     relationship_template = '-[{var}:`{label}`]->'
 
-    class Start(Node):
-        pass
-
-
-    class End(Node):
-        pass
-
-
-    class Other(Node):
-        pass
-
-
-    class Knows(Relationship):
-        pass
-
 
     def get_relationship(self, label, variable=''):
         return self.relationship_template.format(var=variable, label=label)
 
     def setUp(self):
+        class Start(Node):
+            pass
+
+        class End(Node):
+            pass
+
+        class Other(Node):
+            pass
+
+        class Knows(Relationship):
+            pass
+
+        self.Knows = Knows()
+        self.Start = Start()
+        self.Other = Other()
+        self.End = End()
         mapper = Mapper(connection=None)
         self.start_mapper = mapper.get_mapper(self.Start)
         self.end_mapper = mapper.get_mapper(self.End)
@@ -487,7 +488,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels)
         exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end}'.format(
             start=start.labels[0], rel=rel,
             end=rq.other_end_key)
@@ -504,7 +505,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels)
         exp = ('MATCH ({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end}').format(
             start=start.query_variable, rel=rel,
@@ -520,7 +521,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels)
         exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
             start=start.labels[0], rel=rel,
             end=rq.other_end_key)
@@ -537,7 +538,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         start = self.start_mapper.create(id=i_d)
         self.start_mapper(start)
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels[0])
+        rel = self.get_relationship(self.Knows.labels)
         exp = ('MATCH ({start}){rel}({end})'
             ' WHERE id({start}) = ${id} RETURN {end} LIMIT 1').format(
             start=start.query_variable, rel=rel,
