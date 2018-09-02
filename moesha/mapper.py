@@ -578,7 +578,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
                     entity.id = node.id
                     properties = {k:v for k,v  in node.items()}
 
-                    entity.hydrate(**properties)
+                    entity.hydrate(properties=properties, reset=True)
 
     def on_before_create(self, entity):
         pass
@@ -629,7 +629,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
             return helpers.get_by_id(entity=unit.entity, id_val=id_val)
 
-        unit = _Unit(entity=self.entity, action=_get_by_id, mapper=self,
+        unit = _Unit(entity=self.entity(), action=_get_by_id, mapper=self,
             id_val=id_val, event_map=self._event_map)
         self.mapper.add_unit(unit)
         result = self.mapper.send()
@@ -641,7 +641,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return result[0] if len(result) else None
 
 
-class StrcturedEntityMapper(EntityMapper):
+class StructuredEntityMapper(EntityMapper):
     __ALLOW_UNDEFINED_PROPERTIES__ = False
     __ALLOW_UNDEFINED_RELATIONSHIPS__ = False
 
@@ -813,9 +813,9 @@ class Response(Collection):
                     end = data.end
                     labels = data.type
 
-                entity = self.mapper.create(id=data.id, label=list(labels),
+                entity = self.mapper.create(id=data.id, labels=list(labels),
                     properties=data._properties, entity_type=entity_type,
-                    start=start, end=end, loaded_from_source=True)
+                    start=start, end=end)
 
                 self.entities.append(entity)
 
