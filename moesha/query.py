@@ -1,8 +1,8 @@
 import uuid
 
-from pypher import (Pypher, Param, __)
+from pypher.builder import (Pypher, Param, Params, __)
 
-from .entity import (Node, Relationship, Collection)
+from .entity import (Entity, Node, Relationship, Collection)
 from .util import normalize
 
 
@@ -307,33 +307,6 @@ class Query(_BaseQuery):
         return self
 
 
-class Helpers(_BaseQuery):
-
-    def get_by_id(self, entity, id_val=None):
-        '''This method is used to build a query that will return an entity
-        --Node, Relationship-- by its id. It will create a query that looks
-        like:
-
-            MATCH ()-[r0:`Labels`]-() WHERE id(r0) = $r0_id_0 RETURN DISTINCT r
-
-        for relationships OR for nodes
-
-            MATCH (n0:`Labels`) WHERE id(n0) = $n0_id_0 RETURN DISTINCT n0
-        '''
-        if not entity.id and id_val:
-            entity.id = int(id_val)
-
-        VM.set_query_var(entity)
-
-        self._entity_by_id_builder(entity, int(id_val), True)
-
-        self.pypher.MATCH(*self.matches).WHERE(*self.wheres)
-        returns = map(__.DISTINCT, self.returns)
-        self.pypher.RETURN(*returns)
-
-        return str(self.pypher), self.pypher.bound_params
-
-
 class RelationshipQuery(_BaseQuery):
 
     def __init__(self, mapper, direction='out', relationship_entity=None,
@@ -476,3 +449,68 @@ class QueryException(Exception):
 
 class RelatedQueryException(QueryException):
     pass
+
+
+class Builder(Pypher):
+
+    def __init__(self, entity, parent=None, params=None, *args, **kwargs):
+        if isinstance(entity, Entity):
+            VM.set_query_var(entity)
+            params = Params(prefix='', key=entity.query_variable)
+            self.__entity__ = entity
+
+        super(Builder, self).__init__(parent=parent, params=params, *args,
+            **kwargs)
+
+        if isinstance(entity, Relationship):
+            self.MATCH.node(self.start).rel(labels=entity.labels)
+            self.node(self.end)
+        elif isinstance(entity, Node):
+            self.MATCH.node(entity.query_variable, labels=entity.labels)
+        else:
+            msg = ('The entity {} must be either a Node or '
+                'Relationship').format(repr(entity))
+            raise QueryBuilderException(msg)
+
+        if entity.id:
+            self.WHERE(__.id(self.entity) == entity.id)
+
+    def bind_param(self, value, name=None):
+        if not isinstance(value, Param):
+            name = VM.get_next(self.entity, name)
+            param = Param(name, value)
+
+        return super(Builder, self).bind_param(value=Param, name=name)
+
+    @property
+    def start(self):
+        return getattr(__, 'start')
+
+    @property
+    def end(self):
+        return getattr(__, 'end')
+
+    @property
+    def entity(self):
+        return getattr(__, self.__entity__.query_variable)
+
+
+class Helpers(object):
+
+    def get_by_id(self, entity, id_val=None):
+        '''This method is used to build a query that will return an entity
+        --Node, Relationship-- by its id. It will create a query that looks
+        like:
+
+            MATCH ()-[r0:`Labels`]-() WHERE id(r0) = $r0_id_0 RETURN DISTINCT r
+
+        for relationships OR for nodes
+
+            MATCH (n0:`Labels`) WHERE id(n0) = $n0_id_0 RETURN DISTINCT n0
+        '''
+        entity.id = id_val
+        b = Builder(entity)
+
+        b.RETURN.DISTINCT(b.entity)
+
+        return str(b), b.bound_params

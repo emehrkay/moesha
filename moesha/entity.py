@@ -3,7 +3,7 @@ import copy
 from .util import entity_to_labels
 
 
-class _Entity(object):
+class Entity(object):
 
     def __init__(self, id=None, labels=None, properties=None):
         properties = properties or {}
@@ -76,11 +76,11 @@ class _Entity(object):
         return self
 
 
-class Node(_Entity):
+class Node(Entity):
     pass
 
 
-class Relationship(_Entity):
+class Relationship(Entity):
 
     def __init__(self, id=None, start=None, end=None, properties=None,
                  labels=None):

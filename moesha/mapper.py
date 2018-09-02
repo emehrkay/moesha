@@ -15,6 +15,8 @@ from .query import (Query, RelationshipQuery, Helpers)
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
+NODE = 'node'
+RELATIONSHIP = 'relationship'
 GENERIC_MAPPER = 'generic.mapper'
 ENTITY_MAPPER_MAP = {}
 _MEMO = {}
@@ -413,7 +415,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return self.properties.data(entity_data)
 
     def create(self, id=None, entity=None, properties=None, labels=None,
-               start=None, end=None, entity_type='node', data_type='python'):
+               start=None, end=None, entity_type=NODE, data_type='python'):
         properties = self.entity_data(properties or {}, data_type=data_type)
 
         if labels and not entity:
@@ -425,7 +427,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         try:
             entity = entity(id=id, properties=properties, labels=labels)
         except:
-            if entity_type == 'relationship':
+            if entity_type == RELATIONSHIP:
                 entity = Relationship(id=id, labels=labels,
                     properties=properties, start=start, end=end)
             else:
@@ -716,7 +718,7 @@ class Mapper(object):
         return mapper.delete(entity, detach=detach)
 
     def create(self, id=None, entity=None, properties=None, labels=None,
-               entity_type='node', start=None, end=None, data_type='python'):
+               entity_type=NODE, start=None, end=None, data_type='python'):
         if labels and not entity:
             entity = get_entity(labels)
 
@@ -804,11 +806,11 @@ class Response(Collection):
                 data = self.data[key]
                 start = None
                 end = None
-                entity_type = 'node'
+                entity_type = NODE
                 labels = data.labels
 
                 if isinstance(data, types.Relationship):
-                    entity_type = 'relationship'
+                    entity_type = RELATIONSHIP
                     start = data.start
                     end = data.end
                     labels = data.type
