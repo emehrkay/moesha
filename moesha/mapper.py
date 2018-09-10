@@ -9,6 +9,8 @@ from pypher.builder import Pypher, Params
 
 from neo4j.v1 import types
 
+from neobolt.exceptions import ConstraintError
+
 from .entity import Node, Relationship, Collection
 from .property import PropertyManager
 from .query import (Builder, Query, RelationshipQuery, Helpers)
@@ -409,6 +411,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
     entity_context = property(_get_entity_context, _set_entity_context,
         _delete_entity_context)
 
+    def data(self, entity):
+        return entity.data
+
     def entity_data(self, entity_data=None, data_type='python'):
         self.properties.data_type = data_type or self.data_type
 
@@ -745,20 +750,23 @@ class Mapper(object):
         If the unit's entity is a relationship, the start and end entities
         will have their before events run instantly and their after and final 
         events appended to the unit's"""
-        for unit in self.units:
-            unit.prepare()
-            unit.execute_before_events()
+        try:
+            for unit in self.units:
+                unit.prepare()
+                unit.execute_before_events()
 
-            resp = self.query(query=unit.query, params=unit.params)
+                resp = self.query(query=unit.query, params=unit.params)
 
-            unit.execute_after_events(response=resp)
-            unit.execute_final_events()
+                unit.execute_after_events(response=resp)
+                unit.execute_final_events()
 
-            response += resp.data
-
-        self.reset()
-
-        return response
+                response += resp.data
+        except Exception as e:
+            raise e
+        else:
+            return response
+        finally:
+            self.reset()
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:
@@ -767,11 +775,17 @@ class Mapper(object):
 
         from .util import _query_debug
         print(_query_debug(query, params))
-        params = params or {}
-        res = self.connection.query(query=query, params=params)
-        response = Response(mapper=self, response=res)
 
-        return response
+        try:
+            params = params or {}
+            res = self.connection.query(query=query, params=params)
+            response = Response(mapper=self, response=res)
+
+            return response
+        except ConstraintError as ce:
+            raise MapperConstraintError(ce.message)
+        except Exception as e:
+            raise e
 
     def queries(self):
         queries = []
@@ -845,4 +859,24 @@ class Response(Collection):
 
 
 class MapperException(Exception):
-    pass
+
+    def __init__(self, message):
+        self.message = message
+
+
+class MapperConstraintError(MapperException):
+
+    @property
+    def data(self):
+        import re
+
+        r = re.compile("(\w+)\((\d+)\) already exists with label `(.*)` and property `(.*)` = '(.*)'")
+        m = r.findall(self.message)[0]
+
+        return {
+            'entity': m[0],
+            'id': m[1],
+            'labels': m[2],
+            'field': m[3],
+            'value': m[4],
+        }
