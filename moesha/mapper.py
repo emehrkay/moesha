@@ -420,11 +420,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def entity_data(self, entity_data=None, data_type='python'):
         self.properties.data_type = data_type or self.data_type
 
-        data = self.properties.data(entity_data)
-
-        self.properties.reset()
-
-        return data
+        return self.properties.data(entity_data)
 
     def create(self, id=None, entity=None, properties=None, labels=None,
                start=None, end=None, entity_type=NODE, data_type='python'):
