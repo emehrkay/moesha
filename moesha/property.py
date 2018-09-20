@@ -62,6 +62,8 @@ class PropertyManager(object):
                 prop.value = value
                 data[name] = prop.value
 
+        self.reset()
+
         return data
 
     def __getitem__(self, field):
