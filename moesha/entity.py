@@ -30,7 +30,10 @@ class Entity(object):
 
     def _set_labels(self, labels):
         if not labels:
-            labels = entity_to_labels(self).split(':')
+            if self.__class__.__name__ not in ['Node', 'Relationship']:
+                labels = entity_to_labels(self).split(':')
+            else:
+                labels = []
 
         if not isinstance(labels, (list, set, tuple)):
             labels = [labels,]

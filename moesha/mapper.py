@@ -7,6 +7,7 @@ from functools import partial
 from six import with_metaclass
 
 from pypher.builder import Pypher, Params
+from pypher.partial import Partial
 
 from neo4j.v1 import types
 
@@ -772,6 +773,10 @@ class Mapper(object):
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:
+            if isinstance(pypher, Partial):
+                pypher.build()
+                pypher = pypher.pypher
+
             query = str(pypher)
             params = pypher.bound_params
 
@@ -803,6 +808,14 @@ class Mapper(object):
         mapper = self.get_mapper(mapper)
 
         return mapper.builder(entity)
+
+
+class EntityNodeMapper(EntityMapper):
+    entity = Node
+
+
+class EntityRelationshipMapper(EntityMapper):
+    entity = Relationship
 
 
 class Response(Collection):
