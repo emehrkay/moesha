@@ -15,6 +15,12 @@ class PropertyManager(object):
         self.data_type = data_type
         self.allow_undefined = allow_undefined
 
+    def reset(self):
+        for f, p in self.properties.items():
+            p.reset()
+
+        return self
+
     def safely_stringify_for_pudb(self):
         return None
 
@@ -106,10 +112,16 @@ class Property(object):
         self.immutable = False
         self.name = name
         self._value = value
+        self._original_value = value
         self._data_type = data_type
         self.data_type = data_type
         self.default = default or self.default
         self.immutable = immutable
+
+    def reset(self):
+        self._value = self._original_value or self.default
+
+        return self
 
     def _set_data_type(self, data_type):
         self._data_type = data_type
