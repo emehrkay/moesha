@@ -1,5 +1,6 @@
 import copy
 import functools
+import logging
 
 from functools import partial
 
@@ -17,6 +18,7 @@ from .query import (Builder, Query, RelationshipQuery, Helpers)
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
+LOG = logging.getLogger(__name__)
 NODE = 'node'
 RELATIONSHIP = 'relationship'
 GENERIC_MAPPER = 'generic.mapper'
@@ -774,7 +776,8 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        print(_query_debug(query, params))
+        LOG.debug(query, params)
+        LOG.debug(_query_debug(query, params))
 
         try:
             params = params or {}
