@@ -4,6 +4,8 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
+from .query import RelationshipQuery
+
 
 class PropertyManager(object):
 
@@ -241,3 +243,144 @@ class TimeStamp(DateTime):
             return datetime.now()
 
         super().__init__(value=value, default=default, immutable=True)
+
+
+class RelatedManager(object):
+
+    def __init__(self, mapper, relationships, allow_undefined=True):
+        self._relationships = {}
+        self.relationships = relationships or {}
+        self.allow_undefined = allow_undefined
+        self._mapper = None
+        self.mapper = mapper
+
+    def __call__(self, entity):
+        for _, rel in self.relationships.items():
+            rel.start_entity = entity
+
+        return self
+
+    def _get_relationships(self):
+        return self._relationships
+
+    def _set_relationships(self, relationships=None):
+        self._relationships = relationships or {}
+
+    relationships = property(_get_relationships, _set_relationships)
+
+    def _get_mapper(self):
+        return self._mapper
+
+    def _set_mapper(self, mapper):
+        for _, rel in self.relationships.items():
+            rel.mapper = mapper
+
+        return self
+
+    mapper = property(_get_mapper, _set_mapper)
+
+    def __getitem__(self, name):
+        return self.get_relationship(name)
+
+    def get_relationship(self, name):
+        if name in self.relationships:
+            return self.relationships[name]
+
+        if self.allow_undefined:
+            return RelatedEntity(mapper=self.mapper)
+
+        return None
+
+
+class RelatedEntity(object):
+
+    def __init__(self, relationship_entity=None, relationship_type=None,
+                 direction='out', mapper=None, pagination_count=None):
+        if not relationship_entity and not relationship_type:
+            raise Exception()
+
+        self.relationship_entity = relationship_entity
+        self.relationship_type = relationship_type
+        self.direction = direction
+        self._start_entity = None
+        self.results = None
+        self._mapper = mapper
+        self._limit = None
+        self._skip = None
+        self.relationship_query = RelationshipQuery(mapper=mapper,
+            relationship_entity=relationship_entity,
+            relationship_type=relationship_type, direction=direction)
+
+    def reset(self):
+        self._skip = None
+        self._limit = None
+        self.results = None
+        self.relationship_query.reset()
+
+        return self
+
+    def __call__(self, limit=None, skip=None):
+        from .mapper import _Unit
+
+
+        unit = _Unit(entity=self.mapper.entity_context, action=self.query,
+            mapper=self, limit=limit, skip=skip)
+
+        return self.mapper.mapper.add_unit(unit).send()
+
+    def _get_mapper(self):
+        return self._mapper
+
+    def _set_mapper(self, mapper):
+        self._mapper = mapper
+        self.relationship_query.mapper = mapper
+
+        return self
+
+    mapper = property(_get_mapper, _set_mapper)
+
+    def _get_start_entity(self):
+        return self._start_entity
+
+    def _set_start_entity(self, start):
+        self._start_entity = start
+        self.relationship_query.start_entity = start
+
+        return self
+
+    start_entity = property(_get_start_entity, _set_start_entity)
+
+    def skip(self, skip):
+        self._skip = skip
+
+        return self
+
+    def limit(self, limit):
+        self._limit = limit
+
+        return self
+
+    def add(self, entity, **properties):
+        relationship = self.relationship_query.connect(entity=entity,
+                properties=properties)
+
+        self.mapper.mapper.save(relationship)
+
+        return relationship
+
+    def _traverse(self, limit=None, skip=None):
+        query, params = self.query(limit=limit, skip=skip)
+
+    def query(self, limit=None, skip=None, **kwargs):
+        limit = limit or self._limit
+        skip = skip or self._skip
+        self.relationship_query.skip = skip
+        self.relationship_query.limit = limit
+
+        return self.relationship_query.query()
+
+    def next(self):
+        return self
+
+    def iter(self):
+        return self

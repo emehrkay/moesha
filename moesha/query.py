@@ -316,7 +316,6 @@ class RelationshipQuery(_BaseQuery):
         super(RelationshipQuery, self).__init__()
         VM.set_query_var(relationship_entity)
 
-        self.mapper = mapper
         self.direction = direction
         self.relationship_entity = relationship_entity
         self.relationship_type = relationship_type
@@ -389,8 +388,11 @@ class RelationshipQuery(_BaseQuery):
 
     def _build_relationship(self):
         if self.relationship_entity:
-            self.pypher.relationship(direction=self.direction,
-                labels=self.relationship_entity.labels,
+            rel = self.mapper.mapper.create(entity=self.relationship_entity)
+
+            VM.set_query_var(rel)
+            self.pypher.relationship(rel.query_variable,
+                direction=self.direction, labels=rel.labels,
                 **self.relationship_prpoerties)
         else:
             self.pypher.relationship(direction=self.direction,
@@ -399,8 +401,6 @@ class RelationshipQuery(_BaseQuery):
         return self
 
     def query(self):
-        self.start_entity = self.mapper.entity_context
-
         if not self.start_entity:
             raise RelatedQueryException(('Related objects must have a'
                 ' start entity'))
@@ -424,23 +424,21 @@ class RelationshipQuery(_BaseQuery):
         return str(pypher), pypher.bound_params
 
     def connect(self, entity, properties=None):
-        start = self.mapper.entity_context
-
-        if not start:
+        if not self.start_entity:
             raise RelatedQueryException(('The relationship {} does not '))
 
+        kwargs = {
+            'start': self.start_entity,
+            'end': entity,
+            'properties': properties,
+        }
+
         if self.relationship_entity:
-            relationship = self.mapper.create(entity=self.relationship_entity,
-                properties=properties)
+            kwargs['entity'] = self.relationship_entity
         else:
-            relationship = self.mapper.create(entity_type='relationship',
-                properties=properties)
+            kwargs['entity_type'] = 'relationship'
 
-        relationship.start = start
-        relationship.end = entity
-        query = Query(entities=[relationship], params=self.params)
-
-        return query.save()
+        return self.mapper.mapper.create(**kwargs)
 
 
 class QueryException(Exception):

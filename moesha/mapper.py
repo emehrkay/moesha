@@ -14,8 +14,8 @@ from neo4j.v1 import types
 from neobolt.exceptions import ConstraintError
 
 from .entity import Node, Relationship, Collection
-from .property import PropertyManager
-from .query import (Builder, Query, RelationshipQuery, Helpers)
+from .property import PropertyManager, RelatedManager, RelatedEntity
+from .query import Builder, Query, RelationshipQuery, Helpers
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
@@ -74,10 +74,15 @@ class EntityQueryVariable(object):
     @classmethod
     def define(cls, entity):
         if hasattr(entity, 'query_variable') and entity.query_variable:
+            var, count = entity.query_variable.split('_')
+
+            if cls.counts[var] <= int(count):
+                cls.counts[var] = int(count) + 1
+
             return entity.query_variable
 
         t_var = 'n' if isinstance(entity, Node) else 'r'
-        var = '{}{}'.format(t_var, cls.counts[t_var])
+        var = '{}_{}'.format(t_var, cls.counts[t_var])
         cls.counts[t_var] += 1
         entity.query_variable = var
 
@@ -145,122 +150,6 @@ class _Unit(object):
             event()
 
 
-class RelatedManager(object):
-
-    def __init__(self, mapper, relationships, allow_undefined=True):
-        self._relationships = {}
-        self.relationships = relationships or {}
-        self.allow_undefined = allow_undefined
-        self.mapper = mapper
-
-    def __call__(self, entity):
-        for _, rel in self.relationships.items():
-            rel.start_entity = entity
-
-        return self
-
-    def _get_relationships(self):
-        return self._relationships
-
-    def _set_relationships(self, relationships=None):
-        self._relationships = relationships or {}
-
-    relationships = property(_get_relationships, _set_relationships)
-
-    def __getitem__(self, name):
-        if name not in self.relationships and self.allow_undefined:
-            self.relationships[name] = RelatedEntity()
-        else:
-            raise Exception('')
-
-        return self.relationships[name]
-
-    def get_relationship(self, name):
-        if name in self.relationships:
-            return self.relationships[name]
-
-        if self.allow_undefined:
-            return RelatedEntity(mapper=self.mapper)
-
-
-class RelatedEntity(object):
-
-    def __init__(self, relationship_entity=None, relationship_type=None,
-                 direction='out', mapper=None, pagination_count=None):
-        if not relationship_entity and not relationship_type:
-            raise Exception()
-
-        self.relationship_entity = relationship_entity
-        self.relationship_type = relationship_type
-        self.direction = direction
-        self.results = None
-        self._mapper = mapper
-        self._limit = None
-        self._skip = None
-        self.relationship_query = RelationshipQuery(mapper=mapper,
-            relationship_entity=relationship_entity,
-            relationship_type=relationship_type, direction=direction)
-
-    def reset(self):
-        self._skip = None
-        self._limit = None
-        self.results = None
-        self.relationship_query.reset()
-
-        return self
-
-    def __call__(self, limit=None, skip=None):
-        unit = _Unit(entity=self.mapper.entity_context, action=self.query,
-            mapper=self, limit=limit, skip=skip)
-
-        return self.mapper.mapper.add_unit(unit).send()
-
-    def _get_mapper(self):
-        return self._mapper
-
-    def _set_mapper(self, mapper):
-        self._mapper = mapper
-        self.relationship_query.mapper = mapper
-
-        return self
-
-    mapper = property(_get_mapper, _set_mapper)
-
-    def skip(self, skip):
-        self._skip = skip
-
-        return self
-
-    def limit(self, limit):
-        self._limit = limit
-
-        return self
-
-    def connect(self, start, end, **properties):
-        relationship_mapper = self.mapper.get_mapper(self.relationship_entity)
-        relationship = relationship_mapper.create(**properties)
-        relationship_mapper.connect(start=start, end=end,
-            relationship_entity=relationship)
-
-    def _traverse(self, limit=None, skip=None):
-        query, params = self.query(limit=limit, skip=skip)
-
-    def query(self, limit=None, skip=None, **kwargs):
-        limit = limit or self._limit
-        skip = skip or self._skip
-        self.relationship_query.start_entity = self.mapper.entity_context
-        self.relationship_query.skip = skip
-        self.relationship_query.limit = limit
-
-        return self.relationship_query.query()
-
-    def next(self):
-        return self
-
-    def iter(self):
-        return self
-
-
 class _RootMapper(type):
 
     def __new__(cls, name, bases, attrs):
@@ -293,28 +182,12 @@ class _RootMapper(type):
         walk(bases)
         get_props(attrs)
 
-        for n, rel in attrs.get('__RELATIONSHIPS__', []):
-            if isinstance(rel, RelatedEntity):
-                relationships[n] = rel
-
         def __build__(self):
             self.properties = PropertyManager(properties=properties,
                 allow_undefined=glob['undefined_props'], data_type='python')
             self.relationships = RelatedManager(mapper=self,
                 relationships=relationships,
                 allow_undefined=glob['undefined_rels'])
-
-        def _build_relationships(self):
-            for name, rel in relationships.items():
-                rel = copy.deepcopy(rel)
-                rel.mapper = self
-                rel.entity = self.entity
-
-                setattr(self, name, rel)
-
-            self.relationships = {}
-            # self.relationships = RelatedManager(mapper=self,
-            #     relationships=relationships)
 
         cls = super(_RootMapper, cls).__new__(cls, name, bases, attrs)
         entity = attrs.pop('entity', None)
@@ -490,6 +363,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 immediately because the before events for the relationship
                 entity have already been executed. The after events will be
                 added to the _Unit's after_events"""
+                unit.event = self.CREATE
                 start = entity.start
                 end = entity.end
 

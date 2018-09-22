@@ -445,7 +445,6 @@ class RelationshipOutQueryTests(unittest.TestCase):
     direction = 'out'
     relationship_template = '-[{var}:`{label}`]->'
 
-
     def get_relationship(self, label, variable=''):
         return self.relationship_template.format(var=variable, label=label)
 
@@ -482,6 +481,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.assertRaises(RelatedQueryException, get)
 
     def test_can_get_realtionships_for_new_start_node(self):
+        import pudb; pu.db
         rq = RelationshipQuery(mapper=self.start_mapper,
             relationship_entity=self.Knows, direction=self.direction)
         start = self.start_mapper.create()
