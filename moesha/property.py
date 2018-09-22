@@ -58,7 +58,7 @@ class PropertyManager(object):
         for name, value in default.items():
             prop = self.get_property(name, value)
 
-            if prop:
+            if prop is not None:
                 prop.value = value
                 data[name] = prop.value
 
@@ -121,7 +121,10 @@ class Property(object):
         self.immutable = immutable
 
     def reset(self):
-        self._value = self._original_value or self.default
+        if self._original_value is not None:
+            self._value = self._original_value
+        else:
+            self._value = self.default
 
         return self
 
@@ -139,7 +142,7 @@ class Property(object):
         else:
             value = self._value
 
-        if not value and self.default:
+        if value is None and self.default:
             if callable(self.default):
                 value = self.default()
             else:

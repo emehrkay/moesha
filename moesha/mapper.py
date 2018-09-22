@@ -805,7 +805,7 @@ class Mapper(object):
         return queries
 
     def builder(self, entity):
-        mapper = self.get_mapper(mapper)
+        mapper = self.get_mapper(entity)
 
         return mapper.builder(entity)
 
