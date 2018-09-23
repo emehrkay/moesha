@@ -461,7 +461,8 @@ class Builder(Pypher):
             **kwargs)
 
         if isinstance(entity, Relationship):
-            self.MATCH.node(self.start).rel(labels=entity.labels)
+            self.MATCH.node(self.start).rel(entity.query_variable,
+                labels=entity.labels)
             self.node(self.end)
         elif isinstance(entity, Node):
             self.MATCH.node(entity.query_variable, labels=entity.labels)

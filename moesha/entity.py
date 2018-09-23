@@ -15,6 +15,12 @@ class Entity(object):
 
         self.hydrate(properties=properties, reset=True)
 
+    def __repr__(self):
+        fields = ' '.join(['{}={}'.format(k, v) for k,v in self.data.items()])
+
+        return ('<moesha.Entity.{}: {} at {}>').format(self.__class__.__name__,
+            fields, id(self))
+
     @property
     def data(self):
         return self._data
@@ -77,6 +83,9 @@ class Entity(object):
         self._data[name] = value
 
         return self
+
+    def __eq__(self, entity):
+        return (self.id == entity.id and self.labels == entity.labels)
 
 
 class Node(Entity):

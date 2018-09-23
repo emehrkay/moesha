@@ -656,7 +656,7 @@ class Mapper(object):
 
         from .util import _query_debug
         LOG.debug(query, params)
-        LOG.debug(_query_debug(query, params))
+        print(_query_debug(query, params))
 
         try:
             params = params or {}
@@ -720,13 +720,14 @@ class Response(Collection):
                 start = None
                 end = None
                 entity_type = NODE
-                labels = data.labels
 
                 if isinstance(data, types.Relationship):
                     entity_type = RELATIONSHIP
                     start = data.start
                     end = data.end
                     labels = data.type
+                else:
+                    labels = data.labels
 
                 entity = self.mapper.create(id=data.id, labels=list(labels),
                     properties=data._properties, entity_type=entity_type,

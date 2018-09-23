@@ -360,7 +360,8 @@ class RelatedEntity(object):
 
         return self
 
-    def add(self, entity, **properties):
+    def add(self, entity, properties=None):
+        properties = properties or {}
         relationship = self.relationship_query.connect(entity=entity,
                 properties=properties)
 
