@@ -319,12 +319,13 @@ class RelatedEntity(object):
 
         return self
 
-    def __call__(self, limit=None, skip=None):
+    def __call__(self, return_relationship=False, limit=None, skip=None,
+                 wheres=None, orders=None):
         from .mapper import _Unit
 
-
         unit = _Unit(entity=self.mapper.entity_context, action=self.query,
-            mapper=self, limit=limit, skip=skip)
+            mapper=self, limit=limit, skip=skip, wheres=wheres, orders=orders,
+            return_relationship=return_relationship)
 
         return self.mapper.mapper.add_unit(unit).send()
 
@@ -372,13 +373,17 @@ class RelatedEntity(object):
     def _traverse(self, limit=None, skip=None):
         query, params = self.query(limit=limit, skip=skip)
 
-    def query(self, limit=None, skip=None, **kwargs):
+    def query(self, limit=None, skip=None, wheres=None, orders=None,
+              return_relationship=False, **kwargs):
         limit = limit or self._limit
         skip = skip or self._skip
         self.relationship_query.skip = skip
         self.relationship_query.limit = limit
+        self.relationship_query.wheres = wheres
+        self.relationship_query.orders = orders
 
-        return self.relationship_query.query()
+        return self.relationship_query.query(
+            return_relationship=return_relationship)
 
     def next(self):
         return self

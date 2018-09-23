@@ -44,6 +44,7 @@ class _BaseQuery(object):
         self.matched_entities = []
         self.sets = []
         self.wheres = []
+        self.orders = []
         self.returns = []
         self.pypher = Pypher(params=params)
 
@@ -312,13 +313,17 @@ class RelationshipQuery(_BaseQuery):
     def __init__(self, mapper, direction='out', relationship_entity=None,
                  relationship_type=None, relationship_prpoerties=None,
                  start_entity=None, end_entity=None, params=None,
-                 single_relationship=False):
+                 single_relationship=False, start_query_variable='start',
+                 relationship_query_variable='relt', end_query_variable='end'):
         super(RelationshipQuery, self).__init__()
         VM.set_query_var(relationship_entity)
 
         self.direction = direction
         self.relationship_entity = relationship_entity
         self.relationship_type = relationship_type
+        self.start_query_variable = start_query_variable
+        self.relationship_query_variable = relationship_query_variable
+        self.end_query_variable = end_query_variable
         self._start_entity = None
         self.start_entity = start_entity
         self._end_entity = None
@@ -327,11 +332,16 @@ class RelationshipQuery(_BaseQuery):
         self.params = params
         self.skip = None
         self.limit = 1 if single_relationship else None
-        self.other_end_key = 'node_' + str(uuid.uuid4())[-5:]
 
     def reset(self):
         self.skip = None
         self.limit = None
+
+        if self.start_entity:
+            self.start_entity.query_variable = None
+
+        if self.end_entity:
+            self.end_entity.query_variable = None
 
     def _get_start_entity(self):
         return self._start_entity
@@ -341,7 +351,7 @@ class RelationshipQuery(_BaseQuery):
             raise
 
         if entity:
-            VM.set_query_var(entity)
+            entity.query_variable = self.start_query_variable
 
         self._start_entity = entity
 
@@ -354,8 +364,8 @@ class RelationshipQuery(_BaseQuery):
         if entity is not None and not isinstance(entity, Node):
             raise
 
-        if self._end_entity:
-            VM.set_query_var(self._end_entity)
+        if entity:
+            entity.query_variable = self.end_query_variable
 
         self._end_entity = entity
 
@@ -369,12 +379,13 @@ class RelationshipQuery(_BaseQuery):
             self.pypher.MATCH.NODE(qv)
             self.wheres.append(where)
         else:
-            self.pypher.MATCH.NODE(labels=self.start_entity.labels)
+            self.pypher.MATCH.NODE(self.start_query_variable,
+                labels=self.start_entity.labels)
 
         return self
 
     def _build_end(self):
-        qv = self.other_end_key
+        qv = self.end_query_variable
         labels = None
 
         if self.end_entity:
@@ -389,8 +400,8 @@ class RelationshipQuery(_BaseQuery):
     def _build_relationship(self):
         if self.relationship_entity:
             rel = self.mapper.mapper.create(entity=self.relationship_entity)
+            rel.query_variable = self.relationship_query_variable
 
-            VM.set_query_var(rel)
             self.pypher.relationship(rel.query_variable,
                 direction=self.direction, labels=rel.labels,
                 **self.relationship_prpoerties)
@@ -400,7 +411,7 @@ class RelationshipQuery(_BaseQuery):
 
         return self
 
-    def query(self):
+    def query(self, return_relationship=False):
         if not self.start_entity:
             raise RelatedQueryException(('Related objects must have a'
                 ' start entity'))
@@ -411,15 +422,25 @@ class RelationshipQuery(_BaseQuery):
         self._build_start()._build_relationship()._build_end()
 
         if self.wheres:
-            self.pypher.WHERE(*self.wheres)
+            self.pypher.WHERE.CAND(*self.wheres)
 
-        self.pypher.RETURN(*self.returns)
+        if self.orders:
+            self.pypher.ORDER.BY(*self.orders)
 
         if self.skip is not None:
             self.pypher.SKIP(self.skip)
 
         if self.limit is not None:
             self.pypher.LIMIT(self.limit)
+
+        if return_relationship:
+            import pudb; pu.db
+            ret = getattr(__, self.relationship_query_variable)
+            self.returns = [ret,]
+
+        self.pypher.RETURN(*self.returns)
+
+        self.reset()
 
         return str(pypher), pypher.bound_params
 

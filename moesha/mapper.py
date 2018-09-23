@@ -74,10 +74,13 @@ class EntityQueryVariable(object):
     @classmethod
     def define(cls, entity):
         if hasattr(entity, 'query_variable') and entity.query_variable:
-            var, count = entity.query_variable.split('_')
+            try:
+                var, count = entity.query_variable.split('_')
 
-            if cls.counts[var] <= int(count):
-                cls.counts[var] = int(count) + 1
+                if cls.counts[var] <= int(count):
+                    cls.counts[var] = int(count) + 1
+            except ValueError as e:
+                pass
 
             return entity.query_variable
 
