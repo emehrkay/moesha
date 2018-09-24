@@ -720,6 +720,10 @@ class Response(Collection):
 
     data = property(_get_data, _set_data)
 
+    @property
+    def entity_data(self):
+        return super(Response, self).data
+
     def __len__(self):
         return len(self.data)
 

@@ -127,6 +127,10 @@ class Collection(object):
         self.entities = entities or []
         self.index = 0
 
+    @property
+    def data(self):
+        return [e.data for e in self]
+
     def __getitem__(self, field):
         return [entity[field] for entity in self]
 
