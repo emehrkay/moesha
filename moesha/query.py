@@ -325,8 +325,7 @@ class RelatedEntityQuery(_BaseQuery):
                  start_entity=None, end_entity=None, params=None,
                  single_relationship=False, start_query_variable='start',
                  relationship_query_variable='relt', end_query_variable='end'):
-        super(RelationshipQuery, self).__init__()
-        VM.set_query_var(relationship_entity)
+        super(RelatedEntityQuery, self).__init__()
 
         self.direction = direction
         self.relationship_entity = relationship_entity
@@ -344,7 +343,7 @@ class RelatedEntityQuery(_BaseQuery):
         self.limit = 1 if single_relationship else None
 
     def reset(self):
-        super(RelationshipQuery, self).reset()
+        super(RelatedEntityQuery, self).reset()
 
         self.skip = None
         self.limit = None
@@ -421,7 +420,8 @@ class RelatedEntityQuery(_BaseQuery):
 
             pypher.relationship(
                 self.relationship_entity.query_variable,
-                direction=self.direction, labels=rel.labels,
+                direction=self.direction,
+                labels=self.relationship_entity.labels,
                 **self.relationship_prpoerties)
         else:
             pypher.relationship(direction=self.direction,
@@ -433,6 +433,7 @@ class RelatedEntityQuery(_BaseQuery):
         if not self.start_entity:
             raise RelatedQueryException(('Related objects must have a'
                 ' start entity'))
+
         self.pypher = Pypher()
         pypher = self.pypher
 
@@ -466,6 +467,27 @@ class RelatedEntityQuery(_BaseQuery):
         self.reset()
 
         return str(pypher), pypher.bound_params
+
+    def connect(self, entity, properties=None):
+        if not self.start_entity:
+            message = ('The relationship {} does not have a start'
+                ' entity'.format(self.relationship_entity
+                    or self.relationship_type))
+
+            raise RelatedQueryException(('The relationship {} does not '))
+
+        kwargs = {
+            'start': self.start_entity,
+            'end': entity,
+            'properties': properties,
+        }
+
+        if self.relationship_entity:
+            return self.relationship_entity.__class__(**kwargs)
+
+        kwargs['labels'] = self.relationship_type
+
+        return Relationship(**kwargs)
 
 
 class QueryException(Exception):

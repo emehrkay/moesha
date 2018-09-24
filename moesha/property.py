@@ -310,9 +310,8 @@ class RelatedEntity(object):
         self._matches = []
         self._wheres = []
         self._orders = []
-        relationship = self.mapper.mapper.create(entity=self.relationship_entity)
         self.relationship_query = RelatedEntityQuery(
-            relationship_entity=relationship,
+            relationship_entity=None,
             relationship_type=relationship_type, direction=direction)
 
     def reset(self):
@@ -341,6 +340,8 @@ class RelatedEntity(object):
 
     def _set_mapper(self, mapper):
         self._mapper = mapper
+        relationship = mapper.mapper.create(entity=self.relationship_entity)
+        self.relationship_query.relationship_entity = relationship
 
         return self
 

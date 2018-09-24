@@ -15,7 +15,7 @@ from neobolt.exceptions import ConstraintError
 
 from .entity import Node, Relationship, Collection
 from .property import PropertyManager, RelatedManager, RelatedEntity
-from .query import Builder, Query, RelationshipQuery, Helpers
+from .query import Builder, Query, Helpers
 from .util import normalize_labels, entity_name, entity_to_labels
 
 
