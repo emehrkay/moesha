@@ -4,7 +4,7 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 
-from .query import RelationshipQuery
+from .query import RelatedEntityQuery
 
 
 class PropertyManager(object):
@@ -311,7 +311,7 @@ class RelatedEntity(object):
         self._wheres = []
         self._orders = []
         relationship = self.mapper.mapper.create(entity=self.relationship_entity)
-        self.relationship_query = RelationshipQuery(
+        self.relationship_query = RelatedEntityQuery(
             relationship_entity=relationship,
             relationship_type=relationship_type, direction=direction)
 
