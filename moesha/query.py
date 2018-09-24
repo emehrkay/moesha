@@ -372,19 +372,22 @@ class RelationshipQuery(_BaseQuery):
     end_entity = property(_get_end_entity, _set_end_entity)
 
     def _build_start(self):
+        pypher = Pypher()
+
         if self.start_entity.id:
             qv = self.start_entity.query_variable
             where = __.ID(qv) == self.start_entity.id
 
-            self.pypher.MATCH.NODE(qv)
+            pypher.NODE(qv)
             self.wheres.append(where)
         else:
-            self.pypher.MATCH.NODE(self.start_query_variable,
+            pypher.MATCH.NODE(self.start_query_variable,
                 labels=self.start_entity.labels)
 
-        return self
+        return pypher
 
     def _build_end(self):
+        pypher = Pypher()
         qv = self.end_query_variable
         labels = None
 
@@ -392,24 +395,26 @@ class RelationshipQuery(_BaseQuery):
             qv = self.end_entity.query_variable
             labels = self.end_entity.labels
 
-        self.pypher.NODE(qv, labels=labels)
+        pypher.NODE(qv, labels=labels)
         self.returns.append(qv)
 
-        return self
+        return pypher
 
     def _build_relationship(self):
+        pypher = Pypher()
+
         if self.relationship_entity:
             rel = self.mapper.mapper.create(entity=self.relationship_entity)
             rel.query_variable = self.relationship_query_variable
 
-            self.pypher.relationship(rel.query_variable,
+            pypher.relationship(rel.query_variable,
                 direction=self.direction, labels=rel.labels,
                 **self.relationship_prpoerties)
         else:
-            self.pypher.relationship(direction=self.direction,
+            pypher.relationship(direction=self.direction,
                 labels=self.relationship_type)
 
-        return self
+        return pypher
 
     def query(self, return_relationship=False):
         if not self.start_entity:
@@ -419,7 +424,14 @@ class RelationshipQuery(_BaseQuery):
         self.pypher = Pypher()
         pypher = self.pypher
 
-        self._build_start()._build_relationship()._build_end()
+        self.matches.insert(0, self._build_end())
+        self.matches.insert(0, self._build_relationship())
+        self.matches.insert(0, self._build_start())
+
+        self.pypher.MATCH
+
+        for match in self.matches:
+            self.pypher.append(match)
 
         if self.wheres:
             self.pypher.WHERE.CAND(*self.wheres)
@@ -434,7 +446,6 @@ class RelationshipQuery(_BaseQuery):
             self.pypher.LIMIT(self.limit)
 
         if return_relationship:
-            import pudb; pu.db
             ret = getattr(__, self.relationship_query_variable)
             self.returns = [ret,]
 

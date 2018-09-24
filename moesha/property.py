@@ -307,6 +307,9 @@ class RelatedEntity(object):
         self._mapper = mapper
         self._limit = None
         self._skip = None
+        self._matches = []
+        self._wheres = []
+        self._orders = []
         self.relationship_query = RelationshipQuery(mapper=mapper,
             relationship_entity=relationship_entity,
             relationship_type=relationship_type, direction=direction)
@@ -351,6 +354,24 @@ class RelatedEntity(object):
 
     start_entity = property(_get_start_entity, _set_start_entity)
 
+    def match(self, *matches):
+        for m in matches:
+            self._matches.append(w)
+
+        return self
+
+    def where(self, *wheres):
+        for w in wheres:
+            self._wheres.append(w)
+
+        return self
+
+    def order(self, *orders):
+        for o in orders:
+            self._orders.append(o)
+
+        return self
+
     def skip(self, skip):
         self._skip = skip
 
@@ -373,20 +394,21 @@ class RelatedEntity(object):
     def _traverse(self, limit=None, skip=None):
         query, params = self.query(limit=limit, skip=skip)
 
-    def query(self, limit=None, skip=None, wheres=None, orders=None,
-              return_relationship=False, **kwargs):
+    def query(self, limit=None, skip=None, matches=None, wheres=None,
+              orders=None, return_relationship=False, **kwargs):
         limit = limit or self._limit
         skip = skip or self._skip
+        matches = matches or self._matches
+        wheres = wheres or self._wheres
+        orders = orders or self._orders
         self.relationship_query.skip = skip
         self.relationship_query.limit = limit
-        self.relationship_query.wheres = wheres
-        self.relationship_query.orders = orders
+        self.relationship_query.matches = self.relationship_query.matches \
+            + matches
+        self.relationship_query.wheres = self.relationship_query.wheres \
+            + wheres
+        self.relationship_query.orders = self.relationship_query.orders \
+            + orders
 
         return self.relationship_query.query(
             return_relationship=return_relationship)
-
-    def next(self):
-        return self
-
-    def iter(self):
-        return self

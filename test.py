@@ -52,5 +52,5 @@ for i in range(20):
     # import pudb; pu.db
     hc = pm(person)['Comments'].add(comment)
     m.send()
-# import pudb; pu.db
+import pudb; pu.db
 cs = pm(person)['Comments']()
