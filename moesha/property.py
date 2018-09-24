@@ -318,6 +318,9 @@ class RelatedEntity(object):
         self._skip = None
         self._limit = None
         self.results = None
+        self._matches = []
+        self._wheres = []
+        self._orders = []
         self.relationship_query.reset()
 
         return self
@@ -410,5 +413,9 @@ class RelatedEntity(object):
         self.relationship_query.orders = self.relationship_query.orders \
             + orders
 
-        return self.relationship_query.query(
+        response = self.relationship_query.query(
             return_relationship=return_relationship)
+
+        self.reset()
+
+        return response

@@ -48,6 +48,16 @@ class _BaseQuery(object):
         self.returns = []
         self.pypher = Pypher(params=params)
 
+    def reset(self):
+        self.creates = []
+        self.matches = []
+        self.deletes = []
+        self.matched_entities = []
+        self.sets = []
+        self.wheres = []
+        self.orders = []
+        self.returns = []
+
     def _node_by_id(self, entity):
         qv = entity.query_variable
 
@@ -334,6 +344,8 @@ class RelationshipQuery(_BaseQuery):
         self.limit = 1 if single_relationship else None
 
     def reset(self):
+        super(RelationshipQuery, self).reset()
+
         self.skip = None
         self.limit = None
 
@@ -420,7 +432,6 @@ class RelationshipQuery(_BaseQuery):
         if not self.start_entity:
             raise RelatedQueryException(('Related objects must have a'
                 ' start entity'))
-
         self.pypher = Pypher()
         pypher = self.pypher
 

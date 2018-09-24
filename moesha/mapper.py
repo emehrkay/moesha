@@ -291,6 +291,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
         _delete_entity_context)
 
     def data(self, entity):
+        if isinstance(entity, Collection):
+            return [self.data(e) for e in entity]
+
         return entity.data
 
     def entity_data(self, entity_data=None, data_type='python'):
@@ -665,7 +668,7 @@ class Mapper(object):
 
         from .util import _query_debug
         LOG.debug(query, params)
-        print(_query_debug(query, params))
+        LOG.debug(_query_debug(query, params))
 
         try:
             params = params or {}
@@ -732,11 +735,14 @@ class Response(Collection):
 
                 if isinstance(data, types.Relationship):
                     entity_type = RELATIONSHIP
-                    start = data.start
-                    end = data.end
+                    start = data.start_node.id
+                    end = data.end_node.id
                     labels = data.type
                 else:
                     labels = data.labels
+
+                if isinstance(labels, frozenset):
+                    labels = list(labels)
 
                 if not isinstance(labels, (list, set, tuple, frozenset)):
                     labels = [labels,]
