@@ -223,7 +223,7 @@ class Boolean(Property):
         try:
             return self._convert(value)
         except:
-            return False
+            return self.default
 
 
 class DateTime(Float):
