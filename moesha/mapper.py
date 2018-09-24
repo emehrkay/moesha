@@ -31,7 +31,7 @@ ENTITY_MAP = {}
 def get_entity(label=None):
     label = label or []
 
-    if not isinstance(label, (list, set, tuple)):
+    if not isinstance(label, (list, set, tuple, frozenset)):
         label = [label,]
 
     label = normalize_labels(*label)
@@ -371,10 +371,14 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 end = entity.end
 
                 if not isinstance(start, Node):
-                    raise MapperException()
+                    message = ('There must be a start node for the'
+                        ' relationship: {}'.format(entity))
+                    raise MapperException(message)
 
                 if not isinstance(end, Node):
-                    raise MapperException()
+                    message = ('There must be an end node for the'
+                        ' relationship: {}'.format(entity))
+                    raise MapperException(message)
 
                 EQV.define(start)
                 EQV.define(end)
@@ -603,7 +607,9 @@ class Mapper(object):
     def delete(self, entity, detach=True):
         mapper = self.get_mapper(entity=entity)
 
-        return mapper.delete(entity, detach=detach)
+        mapper.delete(entity, detach=detach)
+
+        return self
 
     def create(self, id=None, entity=None, properties=None, labels=None,
                entity_type=NODE, start=None, end=None, data_type='python'):
@@ -732,7 +738,10 @@ class Response(Collection):
                 else:
                     labels = data.labels
 
-                entity = self.mapper.create(id=data.id, labels=list(labels),
+                if not isinstance(labels, (list, set, tuple, frozenset)):
+                    labels = [labels,]
+
+                entity = self.mapper.create(id=data.id, labels=labels,
                     properties=data._properties, entity_type=entity_type,
                     start=start, end=end)
 
