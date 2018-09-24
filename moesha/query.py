@@ -318,9 +318,9 @@ class Query(_BaseQuery):
         return self
 
 
-class RelationshipQuery(_BaseQuery):
+class RelatedEntityQuery(_BaseQuery):
 
-    def __init__(self, mapper, direction='out', relationship_entity=None,
+    def __init__(self, direction='out', relationship_entity=None,
                  relationship_type=None, relationship_prpoerties=None,
                  start_entity=None, end_entity=None, params=None,
                  single_relationship=False, start_query_variable='start',
@@ -416,10 +416,11 @@ class RelationshipQuery(_BaseQuery):
         pypher = Pypher()
 
         if self.relationship_entity:
-            rel = self.mapper.mapper.create(entity=self.relationship_entity)
-            rel.query_variable = self.relationship_query_variable
+            self.relationship_entity.query_variable =\
+                self.relationship_query_variable
 
-            pypher.relationship(rel.query_variable,
+            pypher.relationship(
+                self.relationship_entity.query_variable,
                 direction=self.direction, labels=rel.labels,
                 **self.relationship_prpoerties)
         else:
@@ -465,23 +466,6 @@ class RelationshipQuery(_BaseQuery):
         self.reset()
 
         return str(pypher), pypher.bound_params
-
-    def connect(self, entity, properties=None):
-        if not self.start_entity:
-            raise RelatedQueryException(('The relationship {} does not '))
-
-        kwargs = {
-            'start': self.start_entity,
-            'end': entity,
-            'properties': properties,
-        }
-
-        if self.relationship_entity:
-            kwargs['entity'] = self.relationship_entity
-        else:
-            kwargs['entity_type'] = 'relationship'
-
-        return self.mapper.mapper.create(**kwargs)
 
 
 class QueryException(Exception):
