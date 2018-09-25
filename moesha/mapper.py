@@ -534,8 +534,13 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return result[0] if len(result) else None
 
-    def builder(self, entity=None):
-        return Builder(entity or self.entity())
+    def builder(self, entity=None, query_variable=None):
+        entity = entity or self.entity()
+
+        if query_variable is not None:
+            entity.query_variable = query_variable
+
+        return Builder(entity)
 
 
 class StructuredEntityMapper(EntityMapper):
@@ -690,10 +695,10 @@ class Mapper(object):
 
         return queries
 
-    def builder(self, entity):
+    def builder(self, entity, query_variable=None):
         mapper = self.get_mapper(entity)
 
-        return mapper.builder(entity)
+        return mapper.builder(entity=entity, query_variable=query_variable)
 
 
 class EntityNodeMapper(EntityMapper):
