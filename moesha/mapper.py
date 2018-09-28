@@ -559,8 +559,9 @@ class EntityRelationshipMapper(EntityMapper):
             event_map=self._event_map)
         self.mapper.add_unit(unit)
         res = self.mapper.send()
+        entity.start = res.first()
 
-        return res.first()
+        return entity.start
 
     def end(self, entity):
         def _end(unit):
@@ -572,8 +573,9 @@ class EntityRelationshipMapper(EntityMapper):
             event_map=self._event_map)
         self.mapper.add_unit(unit)
         res = self.mapper.send()
+        entity.end = res.first()
 
-        return res.first()
+        return entity.end
 
 
 class StructuredNodeMapper(EntityNodeMapper):
@@ -797,15 +799,11 @@ class Response(Collection):
                 properties = data._properties
                 _id = data.id
             else:
-                fixed = {}
-
                 for f, v in data.items():
                     if isinstance(v, (types.Node, types.Relationship)):
                         v = self._get_entity(v)
 
-                    fixed[f] = v
-
-                properties = fixed
+                    properties[f] = v
 
             if isinstance(labels, frozenset):
                 labels = list(labels)
