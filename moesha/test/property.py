@@ -359,7 +359,8 @@ class PropertyManagerTests(unittest.TestCase):
         self.assertIsInstance(f, PropertyManager)
         self.assertEqual(1, len(f.properties))
         self.assertEqual(1, len(data))
-        self.assertEqual(v, f['string'])
+        self.assertEqual('', f['string'])
+        self.assertEqual(v, data['string'])
 
     def test_can_create_manager_with_no_fields_and_dynamically_add_string(self):
         f = PropertyManager(allow_undefined=True)

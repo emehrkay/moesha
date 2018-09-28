@@ -58,7 +58,8 @@ for i in range(20):
     # import pudb; pu.db
     hc = pm(person)['Comments'].add(comment)
     m.send()
+cs = pm(person)['Comments'].returns('"mark"', 666, __.projection(__.relt, '.*', Comment=__.end_node))()
+x = cs[0]
 import pudb; pu.db
-cs = pm(person)['Comments'].returns(__.projection(__.relt, '.*', Comment=__.end_node))()
-cs[0]
-import pudb; pu.db
+r = m.query(query='RETURN range(0, 10)')
+x = 3

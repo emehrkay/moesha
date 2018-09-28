@@ -119,8 +119,8 @@ class _Unit(object):
         self.params = None
 
     def __repr__(self):
-        return ('<moesha.mapper._Unit at {} for entity: {} at {}>').format(
-            id(self), entity_name(self.entity), id(self.entity))
+        return ('<moesha.mapper._Unit at {} for entity: {}>').format(
+            id(self), self.entity)
 
     def _get_event(self):
         return self._event
@@ -622,7 +622,7 @@ class Mapper(object):
         index = None
 
         for i, u in enumerate(self.units):
-            if u.entity == entity:
+            if id(u.entity) == id(entity):
                 index = i
                 break
 
