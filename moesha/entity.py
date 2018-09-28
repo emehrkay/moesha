@@ -104,7 +104,10 @@ class Relationship(Entity):
     def _get_labels(self):
         labels = super(Relationship, self).labels
 
-        return labels[0]
+        try:
+            return labels[0]
+        except:
+            return None
 
     def _set_labels(self, labels):
         return super(Relationship, self)._set_labels(labels=labels)

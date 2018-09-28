@@ -3,7 +3,7 @@ import unittest
 from random import random, randint
 
 from moesha.entity import (Node, Relationship)
-from moesha.query import (Query, RelationshipQuery, QueryException,
+from moesha.query import (Query, RelatedEntityQuery, QueryException,
     RelatedQueryException)
 from moesha.mapper import (Mapper)
 
@@ -23,7 +23,7 @@ class NodeQueryTests(unittest.TestCase):
         n = Node(properties={'name': name})
         q = Query(n)
         query, params = q.save()
-        exp = 'CREATE ({var}:`Node` {{`name`: ${val}}}) RETURN {var}'.format(
+        exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
             var=n.query_variable, val=get_dict_key(params, name))
 
         self.assertEqual(exp, query)
@@ -36,7 +36,7 @@ class NodeQueryTests(unittest.TestCase):
         n2 = Node(properties={'name': name2})
         q = Query([n, n2])
         query, params = q.save()
-        exp = 'CREATE ({var}:`Node` {{`name`: ${val}}}), ({var2}:`Node` {{`name`: ${val2}}}) RETURN {var}, {var2}'.format(
+        exp = 'CREATE ({var} {{`name`: ${val}}}), ({var2} {{`name`: ${val2}}}) RETURN {var}, {var2}'.format(
             var=n.query_variable, val=get_dict_key(params, name),
             var2=n2.query_variable, val2=get_dict_key(params, name2))
 
@@ -145,7 +145,7 @@ class NodeQueryTests(unittest.TestCase):
         self.assertEqual(2, len(params))
 
 
-class RelationshipQueryTests(unittest.TestCase):
+class RelatedEntityQueryTests(unittest.TestCase):
 
     def setUp(self):
         self.maxDiff = None
@@ -471,7 +471,7 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
     def test_cannot_get_relationship_because_missing_context(self):
         self.start_mapper.reset()
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, single_relationship=False,
             direction=self.direction)
         
@@ -481,74 +481,76 @@ class RelationshipOutQueryTests(unittest.TestCase):
         self.assertRaises(RelatedQueryException, get)
 
     def test_can_get_realtionships_for_new_start_node(self):
-        import pudb; pu.db
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, direction=self.direction)
         start = self.start_mapper.create()
+        rq.start_entity = start
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels)
-        exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end}'.format(
-            start=start.labels[0], rel=rel,
-            end=rq.other_end_key)
+        rel = self.get_relationship('Knows', rq.relationship_query_variable)
+        exp = 'MATCH ({start}){rel}({end}) RETURN {end}'.format(
+            start=rq.start_query_variable, rel=rel,
+            end=rq.end_query_variable)
         self.assertEqual(exp, query)
         self.assertEqual(0, len(params))
 
     def test_can_get_realtionships_for_existing_start_node(self):
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, direction=self.direction)
         i_d = randint(10, 999)
         start = self.start_mapper.create(id=i_d)
-
+        rq.start_entity = start
         # set context
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels)
+        rel = self.get_relationship('Knows', rq.relationship_query_variable)
         exp = ('MATCH ({start}){rel}({end})'
-            ' WHERE id({start}) = ${id} RETURN {end}').format(
-            start=start.query_variable, rel=rel,
-            end=rq.other_end_key, id=get_dict_key(params, i_d))
+            ' WHERE (id({start}) = ${id}) RETURN {end}').format(
+            start=rq.start_query_variable, rel=rel,
+            end=rq.end_query_variable, id=get_dict_key(params, i_d))
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
     def test_can_get_single_realtionship_for_new_start_node(self):
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, single_relationship=True,
             direction=self.direction)
         start = self.start_mapper.create()
+        rq.start_entity = start
         self.start_mapper(start)
 
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels)
-        exp = 'MATCH (:`{start}`){rel}({end}) RETURN {end} LIMIT 1'.format(
-            start=start.labels[0], rel=rel,
-            end=rq.other_end_key)
+        rel = self.get_relationship('Knows', rq.relationship_query_variable)
+        exp = 'MATCH ({start}){rel}({end}) RETURN {end} LIMIT 1'.format(
+            start=rq.start_query_variable, rel=rel,
+            end=rq.end_query_variable)
 
         self.assertEqual(exp, query)
         self.assertEqual(0, len(params))
 
     def test_can_get_single_realtionship_for_existing_start_node(self):
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, single_relationship=True,
             direction=self.direction)
         start = self.start_mapper.create()
         i_d = randint(10, 999)
         start = self.start_mapper.create(id=i_d)
+        rq.start_entity = start
         self.start_mapper(start)
         query, params = rq.query()
-        rel = self.get_relationship(self.Knows.labels)
+        rel = self.get_relationship('Knows', rq.relationship_query_variable)
         exp = ('MATCH ({start}){rel}({end})'
-            ' WHERE id({start}) = ${id} RETURN {end} LIMIT 1').format(
-            start=start.query_variable, rel=rel,
-            end=rq.other_end_key, id=get_dict_key(params, i_d))
+            ' WHERE (id({start}) = ${id}) RETURN {end} LIMIT 1').format(
+            start=rq.start_query_variable, rel=rel,
+            end=rq.end_query_variable, id=get_dict_key(params, i_d))
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
     def test_cannot_add_new_node_to_unrestricted_relationship(self):
         self.start_mapper.reset()
-        rq = RelationshipQuery(mapper=self.start_mapper,
+        rq = RelatedEntityQuery(
             relationship_entity=self.Knows, single_relationship=False,
             direction=self.direction)
 
@@ -558,9 +560,9 @@ class RelationshipOutQueryTests(unittest.TestCase):
 
         self.assertRaises(RelatedQueryException, add)
 
-    # note: The RelationshipQuery class utilizes the Query class and actual
+    # note: The RelatedEntityQuery class utilizes the Query class and actual
     # query building tests are taken care of in
-    # moesha.test.query.RelationshipQueryTests. No need to repeat it here
+    # moesha.test.query.RelatedEntityQueryTests. No need to repeat it here
 
 
 class RelationshipInQueryTests(RelationshipOutQueryTests):

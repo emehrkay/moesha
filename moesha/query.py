@@ -392,7 +392,7 @@ class RelatedEntityQuery(_BaseQuery):
             pypher.NODE(qv)
             self.wheres.append(where)
         else:
-            pypher.MATCH.NODE(self.start_query_variable,
+            pypher.NODE(self.start_query_variable,
                 labels=self.start_entity.labels)
 
         return pypher
@@ -452,12 +452,6 @@ class RelatedEntityQuery(_BaseQuery):
         if self.orders:
             self.pypher.ORDER.BY(*self.orders)
 
-        if self.skip is not None:
-            self.pypher.SKIP(self.skip)
-
-        if self.limit is not None:
-            self.pypher.LIMIT(self.limit)
-
         if return_relationship:
             ret = getattr(__, self.relationship_query_variable)
             self.returns = [ret,]
@@ -465,6 +459,12 @@ class RelatedEntityQuery(_BaseQuery):
         returns = returns or self.returns
 
         self.pypher.RETURN(*returns)
+
+        if self.skip is not None:
+            self.pypher.SKIP(self.skip)
+
+        if self.limit is not None:
+            self.pypher.LIMIT(self.limit)
 
         self.reset()
 
