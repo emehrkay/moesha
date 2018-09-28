@@ -434,7 +434,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
                 return self._create_relationship(entity)
         else:
-            raise MapperException('NOT ALLOWED')
+            error = ('The entity {} is not allowed to be saved as a '
+                'relationship'.format(entity))
+
+            raise MapperException(error)
 
     def _create_node(self, entity):
         query = Query(entities=[entity,], params=self.mapper.params)
@@ -604,7 +607,6 @@ class Mapper(object):
 
         _ValueManager.reset()
         EQV.reset()
-        # self.params.reset()
 
     def entity_used(self, entity):
         for u in self.units:
@@ -798,12 +800,24 @@ class Response(Collection):
                 labels = data.labels
                 properties = data._properties
                 _id = data.id
-            else:
+            elif isinstance(data, dict):
                 for f, v in data.items():
                     if isinstance(v, (types.Node, types.Relationship)):
                         v = self._get_entity(v)
 
                     properties[f] = v
+            elif isinstance(data, (list, set, tuple)):
+                result = []
+
+                for e in data:
+                    if isinstance(e, (types.Node, types.Relationship)):
+                        e = self._get_entity(e)
+
+                    result.append(e)
+
+                properties['result'] = result
+            else:
+                properties['result'] = data
 
             if isinstance(labels, frozenset):
                 labels = list(labels)
