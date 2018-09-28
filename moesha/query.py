@@ -324,7 +324,7 @@ class RelatedEntityQuery(_BaseQuery):
                  relationship_type=None, relationship_prpoerties=None,
                  start_entity=None, end_entity=None, params=None,
                  single_relationship=False, start_query_variable='start',
-                 relationship_query_variable='relt', end_query_variable='end'):
+                 relationship_query_variable='relt', end_query_variable='end_node'):
         super(RelatedEntityQuery, self).__init__()
 
         self.direction = direction
@@ -429,7 +429,7 @@ class RelatedEntityQuery(_BaseQuery):
 
         return pypher
 
-    def query(self, return_relationship=False):
+    def query(self, return_relationship=False, returns=None):
         if not self.start_entity:
             raise RelatedQueryException(('Related objects must have a'
                 ' start entity'))
@@ -462,7 +462,9 @@ class RelatedEntityQuery(_BaseQuery):
             ret = getattr(__, self.relationship_query_variable)
             self.returns = [ret,]
 
-        self.pypher.RETURN(*self.returns)
+        returns = returns or self.returns
+
+        self.pypher.RETURN(*returns)
 
         self.reset()
 
@@ -532,11 +534,11 @@ class Builder(Pypher):
 
     @property
     def start(self):
-        return getattr(__, 'start')
+        return getattr(__, 'start_node')
 
     @property
     def end(self):
-        return getattr(__, 'end')
+        return getattr(__, 'end_node')
 
     @property
     def entity(self):
@@ -560,5 +562,19 @@ class Helpers(object):
         b = Builder(entity)
 
         b.RETURN.DISTINCT(b.entity)
+
+        return str(b), b.bound_params
+
+    def get_start(self, entity):
+        b = Builder(entity)
+
+        b.RETURN(b.start)
+
+        return str(b), b.bound_params
+
+    def get_end(self, entity):
+        b = Builder(entity)
+
+        b.RETURN(b.end)
 
         return str(b), b.bound_params

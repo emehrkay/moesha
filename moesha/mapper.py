@@ -194,24 +194,23 @@ class _RootMapper(type):
 
         cls = super(_RootMapper, cls).__new__(cls, name, bases, attrs)
         entity = attrs.pop('entity', None)
+        labels = attrs.get('__LABELS__', attrs.get('__TYPE__', None))
+
+        if labels:
+            if not isinstance(labels, (list, tuple, set)):
+                labels = [labels,]
+
+            labels = normalize_labels(*labels)
+        else:
+            labels = entity_to_labels(entity)
 
         if entity:
             map_name = entity_name(entity)
             ENTITY_MAPPER_MAP[map_name] = cls
-
-            labels = attrs.get('__LABELS__', attrs.get('__TYPE__', None))
-
-            if labels:
-                if not isinstance(labels, (list, tuple, set)):
-                    labels = [labels,]
-
-                labels = normalize_labels(*labels)
-            else:
-                labels = entity_to_labels(entity)
-
             ENTITY_MAP[labels] = entity
         elif name == 'EntityMapper':
             ENTITY_MAPPER_MAP[GENERIC_MAPPER] = cls
+            ENTITY_MAP[labels] = cls
 
         setattr(cls, '__build__', __build__)
 
@@ -543,7 +542,46 @@ class EntityMapper(with_metaclass(_RootMapper)):
         return Builder(entity)
 
 
-class StructuredEntityMapper(EntityMapper):
+class EntityNodeMapper(EntityMapper):
+    entity = Node
+
+
+class EntityRelationshipMapper(EntityMapper):
+    entity = Relationship
+
+    def start(self, entity):
+        def _start(unit):
+            helper = Helpers()
+
+            return helper.get_start(entity=entity)
+
+        unit = _Unit(entity=entity, action=_start, mapper=self,
+            event_map=self._event_map)
+        self.mapper.add_unit(unit)
+        res = self.mapper.send()
+
+        return res.first()
+
+    def end(self, entity):
+        def _end(unit):
+            helper = Helpers()
+
+            return helper.get_end(entity=entity)
+
+        unit = _Unit(entity=entity, action=_end, mapper=self,
+            event_map=self._event_map)
+        self.mapper.add_unit(unit)
+        res = self.mapper.send()
+
+        return res.first()
+
+
+class StructuredNodeMapper(EntityNodeMapper):
+    __ALLOW_UNDEFINED_PROPERTIES__ = False
+    __ALLOW_UNDEFINED_RELATIONSHIPS__ = False
+
+
+class StructuredRelationshipMapper(EntityRelationshipMapper):
     __ALLOW_UNDEFINED_PROPERTIES__ = False
     __ALLOW_UNDEFINED_RELATIONSHIPS__ = False
 
@@ -701,14 +739,6 @@ class Mapper(object):
         return mapper.builder(entity=entity, query_variable=query_variable)
 
 
-class EntityNodeMapper(EntityMapper):
-    entity = Node
-
-
-class EntityRelationshipMapper(EntityMapper):
-    entity = Relationship
-
-
 class Response(Collection):
 
     def __init__(self, mapper, response=None):
@@ -737,28 +767,7 @@ class Response(Collection):
             return self.entities[key]
         except Exception as e:
             try:
-                data = self.data[key]
-                start = None
-                end = None
-                entity_type = NODE
-
-                if isinstance(data, types.Relationship):
-                    entity_type = RELATIONSHIP
-                    start = data.start_node.id
-                    end = data.end_node.id
-                    labels = data.type
-                else:
-                    labels = data.labels
-
-                if isinstance(labels, frozenset):
-                    labels = list(labels)
-
-                if not isinstance(labels, (list, set, tuple, frozenset)):
-                    labels = [labels,]
-
-                entity = self.mapper.create(id=data.id, labels=labels,
-                    properties=data._properties, entity_type=entity_type,
-                    start=start, end=end)
+                entity = self._get_entity(self.data[key])
 
                 self.entities.append(entity)
 
@@ -766,6 +775,50 @@ class Response(Collection):
             except Exception as e:
                 self.index = 0
                 raise StopIteration(e)
+
+    def _get_entity(self, data):
+        try:
+            start = None
+            end = None
+            entity_type = NODE
+            labels = None
+            properties = {}
+            _id = None
+
+            if isinstance(data, types.Relationship):
+                entity_type = RELATIONSHIP
+                start = data.start_node.id
+                end = data.end_node.id
+                labels = data.type
+                properties = data._properties
+                _id = data.id
+            elif isinstance(data, types.Node):
+                labels = data.labels
+                properties = data._properties
+                _id = data.id
+            else:
+                fixed = {}
+
+                for f, v in data.items():
+                    if isinstance(v, (types.Node, types.Relationship)):
+                        v = self._get_entity(v)
+
+                    fixed[f] = v
+
+                properties = fixed
+
+            if isinstance(labels, frozenset):
+                labels = list(labels)
+
+            if labels and not isinstance(labels, (list, set, tuple,
+                frozenset)):
+                labels = [labels,]
+
+            return self.mapper.create(id=_id, labels=labels,
+                properties=properties, entity_type=entity_type,
+                start=start, end=end)
+        except Exception as e:
+            raise e
 
     def __iadd__(self, other):
         if isinstance(other, Response):

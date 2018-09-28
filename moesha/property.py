@@ -99,6 +99,8 @@ class PropertyManager(object):
                 obj = Float
             elif isinstance(value, datetime):
                 obj = DateTime
+            else:
+                obj = Property
 
             prop = obj(value=value, data_type=self.data_type, name=field)
 
@@ -310,6 +312,7 @@ class RelatedEntity(object):
         self._matches = []
         self._wheres = []
         self._orders = []
+        self._returns = []
         self.relationship_query = RelatedEntityQuery(
             relationship_entity=None,
             relationship_type=relationship_type, direction=direction)
@@ -321,6 +324,7 @@ class RelatedEntity(object):
         self._matches = []
         self._wheres = []
         self._orders = []
+        self._returns = []
         self.relationship_query.reset()
 
         return self
@@ -386,6 +390,11 @@ class RelatedEntity(object):
 
         return self
 
+    def returns(self, *returns):
+        self._returns = list(returns)
+
+        return self
+
     def add(self, entity, properties=None):
         properties = properties or {}
         relationship = self.relationship_query.connect(entity=entity,
@@ -399,12 +408,13 @@ class RelatedEntity(object):
         query, params = self.query(limit=limit, skip=skip)
 
     def query(self, limit=None, skip=None, matches=None, wheres=None,
-              orders=None, return_relationship=False, **kwargs):
+              orders=None, returns=None, return_relationship=False, **kwargs):
         limit = limit or self._limit
         skip = skip or self._skip
         matches = matches or self._matches
         wheres = wheres or self._wheres
         orders = orders or self._orders
+        returns = returns or self._returns
         self.relationship_query.skip = skip
         self.relationship_query.limit = limit
         self.relationship_query.matches = self.relationship_query.matches \
@@ -413,9 +423,8 @@ class RelatedEntity(object):
             + wheres
         self.relationship_query.orders = self.relationship_query.orders \
             + orders
-
         response = self.relationship_query.query(
-            return_relationship=return_relationship)
+            return_relationship=return_relationship, returns=returns)
 
         self.reset()
 

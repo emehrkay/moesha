@@ -1,3 +1,5 @@
+from pypher.builder import __, Property
+
 from moesha.entity import Node, Relationship
 from moesha.mapper import Mapper, get_mapper, EntityMapper
 from moesha.property import *
@@ -24,6 +26,10 @@ class CommentMappeer(EntityMapper):
 
 class HasComment(Relationship):
     pass
+
+#
+# class HasCommentMapper(EntityMapper):
+#     entity = HasComment
 
 
 class Person(Node):
@@ -53,4 +59,6 @@ for i in range(20):
     hc = pm(person)['Comments'].add(comment)
     m.send()
 import pudb; pu.db
-cs = pm(person)['Comments']()
+cs = pm(person)['Comments'].returns(__.projection(__.relt, '.*', Comment=__.end_node))()
+cs[0]
+import pudb; pu.db
