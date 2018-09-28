@@ -405,7 +405,7 @@ class RelatedEntityQueryTests(unittest.TestCase):
         rel = Relationship(start=n, end=n2, id=_id3)
         q = Query(rel)
         query, params = q.delete()
-        exp = "MATCH ()-[{var}:`{label}`]-() WHERE id({var}) = ${id} DELETE {var}".format(
+        exp = "MATCH ()-[{var}]-() WHERE id({var}) = ${id} DELETE {var}".format(
             var=rel.query_variable, id=get_dict_key(params, _id3),
             label=rel.type)
 
