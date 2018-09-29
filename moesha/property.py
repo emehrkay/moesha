@@ -404,6 +404,13 @@ class RelatedEntity(object):
 
         return relationship
 
+    def delete(self, entity):
+        response = self.relationship_query.delete(entity)
+
+        self.reset()
+
+        return response
+
     def _traverse(self, limit=None, skip=None):
         query, params = self.query(limit=limit, skip=skip)
 

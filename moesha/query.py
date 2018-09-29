@@ -491,12 +491,36 @@ class RelatedEntityQuery(_BaseQuery):
 
         return Relationship(**kwargs)
 
+    def delete(self, entity):
+        if isinstance(entity, Relationship):
+            if entity.id:
+                query = Query(entity)
+
+                return query.delete()
+            elif entity.end and entity.end.id:
+                self.matches.insert(0, self._build_end())
+                self.matches.insert(0, self._build_relationship())
+                self.matches.insert(0, self._build_start())
+
+                self.pypher.MATCH
+
+                for match in self.matches:
+                    self.pypher.append(match)
+
+                self.pypher.DETACH.DELETE(self.relationship_query_variable)
+
+                return str(self.pypher), self.pypher.bound_params
+
 
 class QueryException(Exception):
     pass
 
 
 class RelatedQueryException(QueryException):
+    pass
+
+
+class QueryBuilderException(QueryException):
     pass
 
 

@@ -183,9 +183,10 @@ class RelatedEntityQueryTests(unittest.TestCase):
         since = 'yeserday'
         rel = Relationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
+        import pudb; pu.db
         query, params = q.save()
         label = rel.type
-        exp = ("CREATE ({var}:`Node` {{`name`: ${name}}})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`Node` {{`name`: ${name2}}})"
+        exp = ("CREATE ({var} {{`name`: ${name}}})-[{rel} {{`since`: ${since}}}]->({var2} {{`name`: ${name2}}})"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
                 rel=rel.query_variable, label='Relationship',
                 since=get_dict_key(params, since), var2=end.query_variable,
@@ -346,7 +347,7 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
         exp = ("MATCH ({start}) WHERE id({start}) = ${sid}"
             " MATCH ({end}) WHERE id({end}) = ${eid}"
-            " MATCH ({start})-[{rel}:`{label}`]->({end}) WHERE id({rel}) = ${rid}"
+            " MATCH ({start})-[{rel}]->({end}) WHERE id({rel}) = ${rid}"
             " SET {start}.`name` = ${name}, {end}.`name` = ${name2}, {rel}.`since` = ${since}"
             " RETURN {start}, {end}, {rel}".format(start=start.query_variable,
                 sid=get_dict_key(params, sid), end=end.query_variable,
@@ -429,8 +430,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
         q = Query([rel, rel2])
         query, params = q.delete()
-        exp = ("MATCH ()-[{var}:`{label}`]-() WHERE id({var}) = ${id}"
-            " MATCH ()-[{var2}:`{label2}`]-() WHERE id({var2}) = ${id2}"
+        exp = ("MATCH ()-[{var}]-() WHERE id({var}) = ${id}"
+            " MATCH ()-[{var2}]-() WHERE id({var2}) = ${id2}"
             " DELETE {var}, {var2}".format(var=rel.query_variable,
             id=get_dict_key(params, _id3),
             label=rel.type, var2=rel2.query_variable,
