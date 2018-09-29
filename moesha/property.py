@@ -329,8 +329,8 @@ class RelatedEntity(object):
 
         return self
 
-    def __call__(self, return_relationship=False, limit=None, skip=None,
-                 wheres=None, orders=None):
+    def __call__(self, limit=None, skip=None, matches=None, wheres=None,
+              orders=None, returns=None, return_relationship=False, **kwargs):
         from .mapper import _Unit
 
         unit = _Unit(entity=self.mapper.entity_context, action=self.query,

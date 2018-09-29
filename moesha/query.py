@@ -449,9 +449,6 @@ class RelatedEntityQuery(_BaseQuery):
         if self.wheres:
             self.pypher.WHERE.CAND(*self.wheres)
 
-        if self.orders:
-            self.pypher.ORDER.BY(*self.orders)
-
         if return_relationship:
             ret = getattr(__, self.relationship_query_variable)
             self.returns = [ret,]
@@ -459,6 +456,9 @@ class RelatedEntityQuery(_BaseQuery):
         returns = returns or self.returns
 
         self.pypher.RETURN(*returns)
+
+        if self.orders:
+            self.pypher.ORDER.BY(*self.orders)
 
         if self.skip is not None:
             self.pypher.SKIP(self.skip)
