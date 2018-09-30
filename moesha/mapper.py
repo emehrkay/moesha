@@ -327,11 +327,11 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return entity
 
-    def save(self, entity):
+    def save(self, entity, ensure_unique=False):
         EQV.define(entity)
 
         unit = _Unit(entity=entity, action=self._save_entity, mapper=self,
-            event_map=self._event_map)
+            event_map=self._event_map, ensure_unique=ensure_unique)
         self.mapper.add_unit(unit)
 
         return self
@@ -344,7 +344,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
-    def _save_entity(self, unit):
+    def _save_entity(self, unit, ensure_unique=False):
         entity = unit.entity
         exists = bool(entity.id)
 
@@ -432,7 +432,8 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 unit.final_events = start_mapper._event_map['final'] \
                     + end_mapper._event_map['final'] + unit.final_events
 
-                return self._create_relationship(entity)
+                return self._create_relationship(entity=entity,
+                    ensure_unique=ensure_unique)
         else:
             error = ('The entity {} is not allowed to be saved as a '
                 'relationship'.format(entity))
@@ -449,10 +450,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save()
 
-    def _create_relationship(self, entity):
+    def _create_relationship(self, entity, ensure_unique=False):
         query = Query(entities=[entity,], params=self.mapper.params)
 
-        return query.save()
+        return query.save(ensure_unique=ensure_unique)
 
     def _delete_entity(self, unit, detach=True):
         entity = unit.entity
@@ -645,12 +646,12 @@ class Mapper(object):
 
         return mapper.data(entity)
 
-    def save(self, *entities):
+    def save(self, *entities, ensure_unique=False):
         for entity in entities:
             self.remove_entity_unit(entity)
             mapper = self.get_mapper(entity)
 
-            mapper.save(entity)
+            mapper.save(entity=entity, ensure_unique=ensure_unique)
 
         return self
 

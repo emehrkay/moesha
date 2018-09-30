@@ -40,6 +40,7 @@ class _BaseQuery(object):
     def __init__(self, params=None):
         self.creates = []
         self.matches = []
+        self.merges = []
         self.deletes = []
         self.matched_entities = []
         self.sets = []
@@ -51,6 +52,7 @@ class _BaseQuery(object):
     def reset(self):
         self.creates = []
         self.matches = []
+        self.merges = []
         self.deletes = []
         self.matched_entities = []
         self.sets = []
@@ -106,7 +108,7 @@ class Query(_BaseQuery):
 
         self.entities = entities
 
-    def save(self):
+    def save(self, ensure_unique=False):
         for entity in self.entities:
             if isinstance(entity, Node):
                 if entity.id:
@@ -114,7 +116,8 @@ class Query(_BaseQuery):
                 else:
                     self.create_node(entity)
             elif isinstance(entity, Relationship):
-                self.save_relationship(entity)
+                self.save_relationship(entity=entity,
+                    ensure_unique=ensure_unique)
 
         pypher = self.pypher
 
@@ -124,6 +127,9 @@ class Query(_BaseQuery):
 
         if self.creates:
             pypher.CREATE(*self.creates)
+
+        if self.merges:
+            pypher.MERGE(*self.merges)
 
         if self.sets:
             pypher.SET(*self.sets)
@@ -155,7 +161,7 @@ class Query(_BaseQuery):
 
         return self
 
-    def save_relationship(self, entity):
+    def save_relationship(self, entity, ensure_unique=False):
         """this method handles creating and saving relationships because there
         are minor differences between the two"""
         start = entity.start
@@ -215,7 +221,10 @@ class Query(_BaseQuery):
                 rel.node(end.query_variable, labels=end.labels,
                     **end_properties)
 
-            self.creates.append(rel)
+            if ensure_unique:
+                self.merges.append(rel)
+            else:
+                self.creates.append(rel)
         else:
             _id = VM.get_next(entity, 'id')
             _id = Param(_id, entity.id)
