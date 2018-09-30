@@ -45,21 +45,27 @@ class PersonMapper(EntityMapper):
         'ROOT_TIME': Integer(default=7777777),
     }
     __RELATIONSHIPS__ = {
-        'Comments': RelatedEntity(relationship_entity=HasComment),
+        'Comments': RelatedEntity(relationship_entity=HasComment, ensure_unique=True),
     }
 
 
 pm = m.get_mapper(Person)
 person = m.create(entity=Person, properties={'name': 'mark'})
+comment = m.create(entity=Comment, properties={'text': 'some comment'})
 
-for i in range(20):
+# for i in range(15):
+#     conn = m.create(entity=HasComment, start=person, end=comment)
+#     m.save(conn, ensure_unique=True).send()
+#
+for i in range(10):
     comment = m.create(entity=Comment, properties={'text': 'some comment {}'.format(i)})
     m.save(person, comment).send()
     # import pudb; pu.db
+    hc = pm(person)['Comments'].add(comment)
     hc = pm(person)['Comments'].add(comment)
     m.send()
 cs = pm(person)['Comments'].returns('"mark"', 666, __.projection(__.relt, '.*', Comment=__.end_node))()
 x = cs[0]
 import pudb; pu.db
-r = m.query(query='RETURN range(0, 10)')
+# r = m.query(query='RETURN range(0, 10)')
 x = 3

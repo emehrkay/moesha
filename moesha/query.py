@@ -333,7 +333,8 @@ class RelatedEntityQuery(_BaseQuery):
                  relationship_type=None, relationship_prpoerties=None,
                  start_entity=None, end_entity=None, params=None,
                  single_relationship=False, start_query_variable='start',
-                 relationship_query_variable='relt', end_query_variable='end_node'):
+                 relationship_query_variable='relt',
+                 end_query_variable='end_node'):
         super(RelatedEntityQuery, self).__init__()
 
         self.direction = direction

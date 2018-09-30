@@ -297,13 +297,14 @@ class RelatedManager(object):
 class RelatedEntity(object):
 
     def __init__(self, relationship_entity=None, relationship_type=None,
-                 direction='out', mapper=None, pagination_count=None):
+                 direction='out', mapper=None, ensure_unique=False):
         if not relationship_entity and not relationship_type:
             raise Exception()
 
         self.relationship_entity = relationship_entity
         self.relationship_type = relationship_type
         self.direction = direction
+        self.ensure_unique = ensure_unique
         self._start_entity = None
         self.results = None
         self._mapper = mapper
@@ -314,8 +315,8 @@ class RelatedEntity(object):
         self._orders = []
         self._returns = []
         self.relationship_query = RelatedEntityQuery(
-            relationship_entity=None,
-            relationship_type=relationship_type, direction=direction)
+            relationship_entity=None, direction=direction,
+            relationship_type=relationship_type)
 
     def reset(self):
         self._skip = None
@@ -400,7 +401,8 @@ class RelatedEntity(object):
         relationship = self.relationship_query.connect(entity=entity,
                 properties=properties)
 
-        self.mapper.mapper.save(relationship)
+        self.mapper.mapper.save(relationship,
+            ensure_unique=self.ensure_unique)
 
         return relationship
 
