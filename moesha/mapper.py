@@ -79,7 +79,7 @@ class EntityQueryVariable(object):
 
                 if cls.counts[var] <= int(count):
                     cls.counts[var] = int(count) + 1
-            except ValueError as e:
+            except Exception as e:
                 pass
 
             return entity.query_variable
