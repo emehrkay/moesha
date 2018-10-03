@@ -601,6 +601,11 @@ class Mapper(object):
         self.params = None
         self.units = []
 
+    def __call__(self, entity):
+        mapper = self.get_mapper(entity)
+
+        return mapper(entity)
+
     def reset(self):
         from .query import _ValueManager
 
