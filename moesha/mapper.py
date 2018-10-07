@@ -152,6 +152,62 @@ class _Unit(object):
         for event in self.final_events:
             event()
 
+    def describe(self):
+        return {
+            'Unit': self,
+            'entity': self.entity,
+            'action': self.action,
+            'before_events': self.before_events,
+            'after_events': self.after_events,
+        }
+
+
+class Work(object):
+
+    def __init__(self, mapper):
+        self.mapper = mapper
+        self.units = []
+
+    def save(self, *entities, ensure_unique=False):
+        for entity in entities:
+            self.mapper.save(entity, ensure_unique=ensure_unique, work=self)
+
+        return self
+
+    def add_unit(self, unit):
+        self.units.append(unit)
+
+        return self
+
+    def send(self):
+        response = Response(mapper=self.mapper)
+
+        """each unit will be processed, its before events executed, then the
+        actual query will be run, and the after and final events will be run.
+        If the unit's entity is a relationship, the start and end entities
+        will have their before events run instantly and their after and final
+        events appended to the unit's"""
+        try:
+            for unit in self.units:
+                unit.prepare()
+                unit.execute_before_events()
+
+                resp = self.mapper.query(query=unit.query, params=unit.params)
+
+                unit.execute_after_events(response=resp)
+                unit.execute_final_events()
+
+                response += resp.data
+        except Exception as e:
+            raise e
+        else:
+            return response
+        finally:
+            self.mapper.reset()
+
+    def describe(self):
+        return {u.describe() for u in self.units}
+
 
 class _RootMapper(type):
 
@@ -327,22 +383,28 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return entity
 
-    def save(self, entity, ensure_unique=False):
+    def save(self, entity, ensure_unique=False, work=None):
+        if not work:
+            work = Work(mapper=self.mapper)
+
         EQV.define(entity)
 
         unit = _Unit(entity=entity, action=self._save_entity, mapper=self,
             event_map=self._event_map, ensure_unique=ensure_unique)
-        self.mapper.add_unit(unit)
+        work.add_unit(unit)
 
-        return self
+        return work
 
-    def delete(self, entity, detach=True):
+    def delete(self, entity, detach=True, work=None):
+        if not work:
+            work = Work(mapper=self.mapper)
+
         unit = _Unit(entity=entity, action=self._delete_entity, mapper=self,
             detach=detach, event_map=self._event_map)
 
-        self.mapper.add_unit(unit)
+        work.add_unit(unit)
 
-        return self
+        return work
 
     def _save_entity(self, unit, ensure_unique=False):
         entity = unit.entity
@@ -499,7 +561,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         """This method checkes for changes in the entity's properties and will
         run a method that will handle what should happen if it changed.
         for most properties, naming a method with the format
-        `on_$property_changed` should be fine. But for property names that 
+        `on_$property_changed` should be fine. But for property names that
         would not translate to a Python function name, the EntityMapper must
         modify the _property_change_handlers attribute where the key is the
         property name and the value is the name of the method that will handle
@@ -520,16 +582,19 @@ class EntityMapper(with_metaclass(_RootMapper)):
                     value_from=values['from'], value_to=values['to'])
 
     # Utility methods
-    def get_by_id(self, id_val=None):
+    def get_by_id(self, id_val=None, work=None):
         def _get_by_id(unit, id_val=None):
             helpers = Helpers()
 
             return helpers.get_by_id(entity=unit.entity, id_val=id_val)
 
+        if not work:
+            work = Work(mapper=self.mapper)
+
         unit = _Unit(entity=self.entity(), action=_get_by_id, mapper=self,
             id_val=id_val, event_map=self._event_map)
-        self.mapper.add_unit(unit)
-        result = self.mapper.send()
+        work.add_unit(unit)
+        result = work.send()
 
         if len(result) > 1:
             err = ('There was more than one result for id: {}'.format(id_val))
@@ -559,10 +624,11 @@ class EntityRelationshipMapper(EntityMapper):
 
             return helper.get_start(entity=entity)
 
+        work = Work(mapper=self.mapper)
         unit = _Unit(entity=entity, action=_start, mapper=self,
             event_map=self._event_map)
-        self.mapper.add_unit(unit)
-        res = self.mapper.send()
+        work.add_unit(unit)
+        res = work.send()
         entity.start = res.first()
 
         return entity.start
@@ -573,10 +639,11 @@ class EntityRelationshipMapper(EntityMapper):
 
             return helper.get_end(entity=entity)
 
+        work = Work(mapper=self.mapper)
         unit = _Unit(entity=entity, action=_end, mapper=self,
             event_map=self._event_map)
-        self.mapper.add_unit(unit)
-        res = self.mapper.send()
+        work.add_unit(unit)
+        res = work.send()
         entity.end = res.first()
 
         return entity.end
@@ -651,21 +718,27 @@ class Mapper(object):
 
         return mapper.data(entity)
 
-    def save(self, *entities, ensure_unique=False):
+    def save(self, *entities, ensure_unique=False, work=None):
+        if not work:
+            work = Work(mapper=self)
+
         for entity in entities:
             self.remove_entity_unit(entity)
             mapper = self.get_mapper(entity)
 
-            mapper.save(entity=entity, ensure_unique=ensure_unique)
+            mapper.save(entity=entity, ensure_unique=ensure_unique, work=work)
 
-        return self
+        return work
 
-    def delete(self, entity, detach=True):
+    def delete(self, entity, detach=True, work=None):
+        if not work:
+            work = Work(mapper=self)
+
         mapper = self.get_mapper(entity=entity)
 
-        mapper.delete(entity, detach=detach)
+        mapper.delete(entity, detach=detach, work=work)
 
-        return self
+        return work
 
     def create(self, id=None, entity=None, properties=None, labels=None,
                entity_type=NODE, start=None, end=None, data_type='python'):
@@ -683,32 +756,6 @@ class Mapper(object):
         mapper = self.get_mapper(entity=entity)
 
         return mapper.get_by_id(id_val=id_val)
-
-    def send(self):
-        response = Response(mapper=self)
-
-        """each unit will be processed, its before events executed, then the
-        actual query will be run, and the after and final events will be run.
-        If the unit's entity is a relationship, the start and end entities
-        will have their before events run instantly and their after and final 
-        events appended to the unit's"""
-        try:
-            for unit in self.units:
-                unit.prepare()
-                unit.execute_before_events()
-
-                resp = self.query(query=unit.query, params=unit.params)
-
-                unit.execute_after_events(response=resp)
-                unit.execute_final_events()
-
-                response += resp.data
-        except Exception as e:
-            raise e
-        else:
-            return response
-        finally:
-            self.reset()
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:

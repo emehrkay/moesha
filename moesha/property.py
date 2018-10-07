@@ -333,13 +333,14 @@ class RelatedEntity(object):
     def __call__(self, return_relationship=False, limit=None, skip=None,
                  matches=None, wheres=None, orders=None, returns=None,
                  **kwargs):
-        from .mapper import _Unit
+        from .mapper import _Unit, Work
 
+        work = Work(mapper=self.mapper.mapper)
         unit = _Unit(entity=self.mapper.entity_context, action=self.query,
             mapper=self, limit=limit, skip=skip, wheres=wheres, orders=orders,
             return_relationship=return_relationship)
 
-        return self.mapper.mapper.add_unit(unit).send()
+        return work.add_unit(unit).send()
 
     def _get_mapper(self):
         return self._mapper
