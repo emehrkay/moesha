@@ -186,9 +186,32 @@ class Work(object):
         self.mapper = mapper
         self.units = []
 
+    def remove_entity_unit(self, entity):
+        """This method will ensure that an entity only has one unit of work
+        registered with the Mapper. It will also reset any matched
+        EntityMapper if found"""
+        index = None
+
+        for i, u in enumerate(self.units):
+            if id(u.entity) == id(entity):
+                index = i
+                break
+
+        if index is not None:
+            self.units[i].mapper.reset()
+            del self.units[i]
+
+        return self
+
     def save(self, *entities, ensure_unique=False):
         for entity in entities:
-            self.mapper.save(entity, ensure_unique=ensure_unique, work=self)
+            self.mapper.save(entity=entity, ensure_unique=ensure_unique,
+                work=self)
+
+        return self
+
+    def delete(self, entity, detach=True):
+        self.mapper.delete(entity=entity, detach=detach, work=self)
 
         return self
 
@@ -225,6 +248,15 @@ class Work(object):
 
     def describe(self):
         return [u.describe() for u in self.units]
+
+    def queries(self):
+        queries = []
+
+        for unit in self.units:
+            unit.prepare()
+            queries.append((unit.query, unit.params,))
+
+        return queries
 
 
 class _RootMapper(type):
@@ -706,23 +738,6 @@ class Mapper(object):
 
         return False
 
-    def remove_entity_unit(self, entity):
-        """This method will ensure that an entity only has one unit of work
-        registered with the Mapper. It will also reset any matched
-        EntityMapper if found"""
-        index = None
-
-        for i, u in enumerate(self.units):
-            if id(u.entity) == id(entity):
-                index = i
-                break
-
-        if index is not None:
-            self.units[i].mapper.reset()
-            del self.units[i]
-
-        return self
-
     def add_unit(self, unit):
         self.units.append(unit)
 
@@ -741,7 +756,7 @@ class Mapper(object):
             work = Work(mapper=self)
 
         for entity in entities:
-            self.remove_entity_unit(entity)
+            work.remove_entity_unit(entity)
             mapper = self.get_mapper(entity)
 
             mapper.save(entity=entity, ensure_unique=ensure_unique, work=work)
@@ -798,15 +813,6 @@ class Mapper(object):
             raise MapperConstraintError(ce.message)
         except Exception as e:
             raise e
-
-    def queries(self):
-        queries = []
-
-        for unit in self.units:
-            unit.prepare()
-            queries.append((unit.query, unit.params,))
-
-        return queries
 
     def builder(self, entity, query_variable=None):
         mapper = self.get_mapper(entity)

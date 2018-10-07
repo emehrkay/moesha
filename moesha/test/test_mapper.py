@@ -151,10 +151,10 @@ class MapperTests(unittest.TestCase):
         my_mapper = mapper.get_mapper(mn)
         my_mapper.before_save = 'BEFOERESAVE'
         my_mapper.updated = 'UDPATED{}'.format(random())
-        mapper.save(mn)
+        work = mapper.save(mn)
 
-        queries = mapper.queries()
-        mapper.send()
+        queries = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.before_save, my_mapper.updated)
         self.assertEqual(1, len(queries))
@@ -176,9 +176,9 @@ class MapperTests(unittest.TestCase):
         my_mapper = mapper.get_mapper(mn)
         my_mapper.after_save = 'AFTERESAVE'
         my_mapper.updated = 'UDPATED{}'.format(random())
-        mapper.save(mn)
-        queries = mapper.queries()
-        mapper.send()
+        work = mapper.save(mn)
+        queries = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated)
         self.assertEqual(1, len(queries))
@@ -205,9 +205,9 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_save = 'BEFOERESAVE'
         my_mapper.updated_before = 'UDPATED{}'.format(random())
         my_mapper.updated_after = 'UDPATED{}'.format(random())
-        mapper.save(mn)
-        query = mapper.queries()
-        mapper.send()
+        work = mapper.save(mn)
+        query = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
         self.assertEqual(my_mapper.before_save, my_mapper.updated_before)
@@ -235,9 +235,9 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_update = 'BEFOERESAVE'
         my_mapper.updated_before = 'UDPATED{}'.format(random())
         my_mapper.updated_after = 'UDPATED{}'.format(random())
-        mapper.save(mn)
-        query = mapper.queries()
-        mapper.send()
+        work = mapper.save(mn)
+        query = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.after_update, my_mapper.updated_after)
         self.assertEqual(my_mapper.before_update, my_mapper.updated_before)
@@ -265,9 +265,9 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_delete = 'BEFOEREDELETE'
         my_mapper.deleted_before = 'UDPATED{}'.format(random())
         my_mapper.deleted_after = 'UDPATED{}'.format(random())
-        mapper.delete(mn)
-        query = mapper.queries()
-        mapper.send()
+        work = mapper.delete(mn)
+        query = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.after_delete, my_mapper.deleted_after)
         self.assertEqual(my_mapper.before_delete, my_mapper.deleted_before)
@@ -301,7 +301,7 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_save = 'BEFOERESAVE'
         my_mapper.updated_before = 'UDPATED{}'.format(random())
         my_mapper.updated_after = 'UDPATED{}'.format(random())
-        mapper.save(mn)
+        work = mapper.save(mn)
 
         mn = mapper.create(entity=MyNode4, id=999)
         my_mapper = mapper.get_mapper(mn)
@@ -309,9 +309,9 @@ class MapperTests(unittest.TestCase):
         my_mapper.before_delete = 'BEFOEREDELETE'
         my_mapper.deleted_before = 'UDPATED{}'.format(random())
         my_mapper.deleted_after = 'UDPATED{}'.format(random())
-        mapper.delete(mn)
-        query = mapper.queries()
-        mapper.send()
+        work = mapper.delete(mn, work=work)
+        query = work.queries()
+        work.send()
 
         self.assertEqual(my_mapper.after_save, my_mapper.updated_after)
         self.assertEqual(my_mapper.before_save, my_mapper.updated_before)
@@ -337,8 +337,8 @@ class MapperCreateTests(unittest.TestCase):
         p = {'name': name}
         n = Node(properties=p)
 
-        self.mapper.save(n)
-        queries = self.mapper.queries()
+        work = self.mapper.save(n)
+        queries = work.queries()
         query, params = queries[0]
 
         self.assertEqual(1, len(params))
@@ -352,11 +352,11 @@ class MapperCreateTests(unittest.TestCase):
         n2 = Node(properties=p)
         n3 = Node(properties=p)
 
-        self.mapper.save(n)
-        self.mapper.save(n2)
-        self.mapper.save(n3)
+        work = self.mapper.save(n)
+        self.mapper.save(n2, work=work)
+        self.mapper.save(n3, work=work)
 
-        queries = self.mapper.queries()
+        queries = work.queries()
 
         self.assertEqual(3, len(queries))
 
@@ -368,9 +368,8 @@ class MapperCreateTests(unittest.TestCase):
         start = Node(properties=p)
         end = Node(properties=p)
         rel = Relationship(start=start, end=end)
-
-        self.mapper.save(rel)
-        queries = self.mapper.queries()
+        work = self.mapper.save(rel)
+        queries = work.queries()
 
         self.assertEqual(1, len(queries))
         self.assertTrue(queries[0][0].startswith('CREATE'))
@@ -387,9 +386,8 @@ class MapperUpdateTests(unittest.TestCase):
         name = 'some name'
         n = Node(id=id)
         n['name'] = name
-
-        self.mapper.save(n)
-        query = self.mapper.queries()
+        work = self.mapper.save(n)
+        query = work.queries()
         params = query[0][1]
 
         self.assertEqual(1, len(query))
@@ -408,10 +406,9 @@ class MapperUpdateTests(unittest.TestCase):
         name2 = 'some name222'
         n2 = Node(id=id2)
         n2['name'] = name2
-
-        self.mapper.save(n)
-        self.mapper.save(n2)
-        query = self.mapper.queries()
+        work = self.mapper.save(n)
+        self.mapper.save(n2, work=work)
+        query = work.queries()
 
         self.assertEqual(2, len(query))
         self.assertIn('SET', query[0][0])
@@ -433,9 +430,8 @@ class MapperUpdateTests(unittest.TestCase):
         n2['name'] = name2
         rid = 9988
         rel = Relationship(start=n, end=n2, id=rid)
-
-        self.mapper.save(rel)
-        query = self.mapper.queries()
+        work = self.mapper.save(rel)
+        query = work.queries()
 
         self.assertEqual(1, len(query))
         self.assertIn('SET', query[0][0])
@@ -470,9 +466,9 @@ class MapperUpdateTests(unittest.TestCase):
         rid2 = 99887
         rel2 = Relationship(start=n3, end=n4, id=rid2)
 
-        self.mapper.save(rel)
-        self.mapper.save(rel2)
-        query = self.mapper.queries()
+        work = self.mapper.save(rel)
+        self.mapper.save(rel2, work=work)
+        query = work.queries()
 
         self.assertEqual(2, len(query))
         self.assertIn('SET', query[0][0])
@@ -591,8 +587,8 @@ class MapperDeleteTests(unittest.TestCase):
     def test_can_delete_single_node(self):
         _id = 999
         n = Node(id=_id)
-        self.mapper.delete(n)
-        query = self.mapper.queries()
+        work = self.mapper.delete(n)
+        query = work.queries()
 
         self.assertEqual(1, len(query))
         self.assertEqual(1, len(query[0][1]))
@@ -603,9 +599,9 @@ class MapperDeleteTests(unittest.TestCase):
         n = Node(id=_id)
         _id2 = 9998
         n2 = Node(id=_id2)
-        self.mapper.delete(n)
-        self.mapper.delete(n2)
-        query = self.mapper.queries()
+        work = self.mapper.delete(n)
+        self.mapper.delete(n2, work=work)
+        query = work.queries()
 
         self.assertEqual(2, len(query))
         self.assertEqual(1, len(query[0][1]))
@@ -621,8 +617,8 @@ class MapperDeleteTests(unittest.TestCase):
         n2 = Node(id=_id2)
         _id3 = 8989
         rel = Relationship(start=n, end=n2, id=_id3)
-        self.mapper.delete(rel)
-        query = self.mapper.queries()
+        work = self.mapper.delete(rel)
+        query = work.queries()
 
         self.assertEqual(1, len(query))
         self.assertEqual(1, len(query[0][1]))
@@ -642,8 +638,9 @@ class MapperDeleteTests(unittest.TestCase):
         nn2 = Node(id=_id22)
         _id4 = 9991
         rel2 = Relationship(start=nn, end=nn2, id=_id4)
-        self.mapper.delete(rel).delete(rel2)
-        query = self.mapper.queries()
+        work = self.mapper.delete(rel)
+        work.delete(rel2)
+        query = work.queries()
 
         self.assertEqual(2, len(query))
         self.assertEqual(1, len(query[0][1]))
