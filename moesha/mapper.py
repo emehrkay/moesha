@@ -1,4 +1,5 @@
 import copy
+import inspect
 import functools
 import logging
 
@@ -153,12 +154,29 @@ class _Unit(object):
             event()
 
     def describe(self):
+
+        def name(obj):
+            parts = []
+            parts.append(inspect.getmodule(obj).__name__)
+
+            try:
+                if obj.__self__:
+                    parts.append(obj.__self__.__class__.__name__)
+            except Exception as e:
+                pass
+
+            parts.append(obj.__name__)
+
+            return '.'.join(parts)
+
+        self.prepare()
+
         return {
             'Unit': self,
             'entity': self.entity,
-            'action': self.action,
-            'before_events': self.before_events,
-            'after_events': self.after_events,
+            'action': name(self.action),
+            'before_events': [name(b) for b in self.before_events],
+            'after_events': [name(a) for a in self.after_events],
         }
 
 
@@ -206,7 +224,7 @@ class Work(object):
             self.mapper.reset()
 
     def describe(self):
-        return {u.describe() for u in self.units}
+        return [u.describe() for u in self.units]
 
 
 class _RootMapper(type):
