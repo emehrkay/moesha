@@ -114,7 +114,7 @@ class Property(object):
     default = None
 
     def __init__(self, value=None, data_type='python', default=None,
-                 immutable=False, name=None):
+                 immutable=False, name=None, options=None):
         self.immutable = False
         self.name = name
         self._value = value
@@ -123,6 +123,7 @@ class Property(object):
         self.data_type = data_type
         self.default = default or self.default
         self.immutable = immutable
+        self.options = options or []
 
     def reset(self):
         if self._original_value is not None:
@@ -159,6 +160,9 @@ class Property(object):
 
     def _set_value(self, value):
         if self.immutable:
+            return
+
+        if options and value not in self.options:
             return
 
         self._value = value
@@ -398,7 +402,7 @@ class RelatedEntity(object):
 
         return self
 
-    def add(self, entity, properties=None):
+    def add(self, entity, properties=None, work=None):
         properties = properties or {}
         relationship = self.relationship_query.connect(entity=entity,
                 properties=properties)
