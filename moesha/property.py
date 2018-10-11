@@ -406,11 +406,10 @@ class RelatedEntity(object):
         properties = properties or {}
         relationship = self.relationship_query.connect(entity=entity,
                 properties=properties)
-
-        self.mapper.mapper.save(relationship,
+        work = self.mapper.mapper.save(relationship,
             ensure_unique=self.ensure_unique, work=work)
 
-        return relationship
+        return relationship, work
 
     def delete(self, entity):
         response = self.relationship_query.delete(entity)
