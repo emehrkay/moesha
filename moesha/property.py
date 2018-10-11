@@ -408,7 +408,7 @@ class RelatedEntity(object):
                 properties=properties)
 
         self.mapper.mapper.save(relationship,
-            ensure_unique=self.ensure_unique)
+            ensure_unique=self.ensure_unique, work=work)
 
         return relationship
 
