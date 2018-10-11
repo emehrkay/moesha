@@ -162,7 +162,7 @@ class Property(object):
         if self.immutable:
             return
 
-        if options and value not in self.options:
+        if self.options and value not in self.options:
             return
 
         self._value = value
@@ -371,7 +371,7 @@ class RelatedEntity(object):
 
     def match(self, *matches):
         for m in matches:
-            self._matches.append(w)
+            self._matches.append(m)
 
         return self
 
@@ -418,9 +418,6 @@ class RelatedEntity(object):
         self.reset()
 
         return response
-
-    def _traverse(self, limit=None, skip=None):
-        query, params = self.query(limit=limit, skip=skip)
 
     def query(self, limit=None, skip=None, matches=None, wheres=None,
               orders=None, returns=None, return_relationship=False, **kwargs):

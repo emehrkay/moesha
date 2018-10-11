@@ -370,6 +370,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
+    def __build__(self):
+        pass
+
     def __getitem__(self, relationship_name):
         return self.relationships[relationship_name]
 
@@ -530,13 +533,13 @@ class EntityMapper(with_metaclass(_RootMapper)):
                     bind_event(event)
 
                 for event in end_events['after']:
-                    def bind_event(end_event):
+                    def bind_after_event(end_event):
                         def after_event(entity, response=None):
                             end_event(end, response)
 
                         afters.append(after_event)
 
-                    bind_event(event)
+                    bind_after_event(event)
 
                 unit.after_events = afters + unit.after_events
 
@@ -930,7 +933,7 @@ class MapperConstraintError(MapperException):
     def data(self):
         import re
 
-        r = re.compile("(\w+)\((\d+)\) already exists with label `(.*)` and property `(.*)` = '(.*)'")
+        r = re.compile(r"(\w+)\((\d+)\) already exists with label `(.*)` and property `(.*)` = '(.*)'")
         m = r.findall(self.message)[0]
 
         return {
