@@ -48,7 +48,9 @@ def get_mapper(entity, mapper):
 
     if name in ENTITY_MAPPER_MAP:
         if name in _MEMO:
-            _MEMO[name].mapper = mapper
+            if mapper:
+                _MEMO[name].mapper = mapper
+
             return _MEMO[name]
 
         mapper = ENTITY_MAPPER_MAP[name](mapper=mapper)
@@ -57,7 +59,9 @@ def get_mapper(entity, mapper):
         return mapper
 
     if GENERIC_MAPPER in _MEMO:
-        _MEMO[GENERIC_MAPPER].mapper = mapper
+        if mapper:
+            _MEMO[GENERIC_MAPPER].mapper = mapper
+
         return _MEMO[GENERIC_MAPPER]
 
     mapper = ENTITY_MAPPER_MAP[GENERIC_MAPPER](mapper=mapper)
@@ -80,7 +84,7 @@ class EntityQueryVariable(object):
 
                 if cls.counts[var] <= int(count):
                     cls.counts[var] = int(count) + 1
-            except Exception as e:
+            except:
                 pass
 
             return entity.query_variable
@@ -244,7 +248,7 @@ class Work(object):
         else:
             return response
         finally:
-            self.mapper.reset()
+            self.reset()
 
     def describe(self):
         return [u.describe() for u in self.units]
@@ -258,6 +262,14 @@ class Work(object):
 
         return queries
 
+    def reset(self):
+        self.mapper.reset()
+
+        for unit in self.units:
+            unit.entity.query_variable = None
+
+        return self
+
 
 class _RootMapper(type):
 
@@ -266,9 +278,9 @@ class _RootMapper(type):
         properties = {}
         glob = {
             'undefined_props': attrs.get('__ALLOW_UNDEFINED_PROPERTIES__',
-                True),
+                None),
             'undefined_rels': attrs.get('__ALLOW_UNDEFINED_RELATIONSHIPS__',
-                True),
+                None),
         }
 
         def get_props(source):
@@ -277,6 +289,14 @@ class _RootMapper(type):
 
             properties.update(props)
             relationships.update(rels)
+
+            # if glob['undefined_props'] is None:
+            glob['undefined_props'] = source.get(
+                '__ALLOW_UNDEFINED_PROPERTIES__', None)
+
+            # if glob['undefined_rels'] is None:
+            glob['undefined_rels'] = source.get(
+                '__ALLOW_UNDEFINED_RELATIONSHIPS__', None)
 
         def walk(bases):
             walk_bases = list(bases)
@@ -293,10 +313,10 @@ class _RootMapper(type):
 
         def __build__(self):
             self.properties = PropertyManager(properties=properties,
-                allow_undefined=glob['undefined_props'], data_type='python')
+                allow_undefined=bool(glob['undefined_props']), data_type='python')
             self.relationships = RelatedManager(mapper=self,
                 relationships=relationships,
-                allow_undefined=glob['undefined_rels'])
+                allow_undefined=bool(glob['undefined_rels']))
 
         cls = super(_RootMapper, cls).__new__(cls, name, bases, attrs)
         entity = attrs.pop('entity', None)
@@ -745,6 +765,9 @@ class Mapper(object):
         self.units.append(unit)
 
         return self
+
+    def get_work(self):
+        return Work(mapper=self)
 
     def get_mapper(self, entity):
         return get_mapper(entity=entity, mapper=self)

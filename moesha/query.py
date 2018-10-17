@@ -6,6 +6,12 @@ from .entity import (Entity, Node, Relationship, Collection)
 from .util import normalize
 
 
+def get_mapper(entity):
+    from .mapper import get_mapper as gm
+
+    return gm(entity, None)
+
+
 class _ValueManager(object):
     values = {}
 
@@ -303,7 +309,8 @@ class Query(_BaseQuery):
 
     def _properties(self, entity):
         props = {}
-        properties = entity.data
+        mapper = get_mapper(entity)
+        properties = mapper.entity_data(entity.data)
 
         for field, value in properties.items():
             name = VM.get_next(entity, field)
@@ -332,7 +339,7 @@ class RelatedEntityQuery(_BaseQuery):
     def __init__(self, direction='out', relationship_entity=None,
                  relationship_type=None, relationship_prpoerties=None,
                  start_entity=None, end_entity=None, params=None,
-                 single_relationship=False, start_query_variable='start',
+                 single_relationship=False, start_query_variable='start_node',
                  relationship_query_variable='relt',
                  end_query_variable='end_node'):
         super(RelatedEntityQuery, self).__init__()

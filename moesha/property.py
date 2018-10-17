@@ -107,7 +107,7 @@ class PropertyManager(object):
             if prop not in self.properties:
                 self.properties[field] = prop
 
-        return prop
+        return None
 
 
 class Property(object):
