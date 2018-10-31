@@ -183,6 +183,45 @@ class _Unit(object):
             'after_events': [name(a) for a in self.after_events],
         }
 
+    def reset(self):
+        if self.entity:
+            self.entity.query_variable = None
+
+        return self
+
+
+class _QueryUnit(_Unit):
+
+    def __init__(self, mapper, query=None, params=None, pypher=None, **kwargs):
+        super(_QueryUnit, self).__init__(entity=None, action=None,
+            mapper=mapper)
+
+        if pypher:
+            if isinstance(pypher, Partial):
+                pypher.build()
+                pypher = pypher.pypher
+
+            query = str(pypher)
+            params = pypher.bound_params
+
+        self.query = query
+        self.params = params
+        self.pypher = pypher
+        self.final_events = []
+
+    def __repr__(self):
+        return ('<moesha.mapper._QueryUnit at {}>').format(id(self))
+
+    def prepare(self):
+        return self.query, self.params
+
+    def describe(self):
+        return {
+            'QueryUnit': self,
+            'query': self.query,
+            'params': self.params,
+        }
+
 
 class Work(object):
 
@@ -223,6 +262,12 @@ class Work(object):
         self.units.append(unit)
 
         return self
+
+    def add_query(self, query=None, params=None, pypher=None):
+        unit = _QueryUnit(mapper=self.mapper, query=query, params=params,
+            pypher=pypher)
+
+        return self.add_unit(unit)
 
     def send(self):
         response = Response(mapper=self.mapper)
@@ -266,7 +311,7 @@ class Work(object):
         self.mapper.reset()
 
         for unit in self.units:
-            unit.entity.query_variable = None
+            unit.reset()
 
         return self
 
