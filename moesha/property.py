@@ -411,6 +411,9 @@ class RelatedEntity(object):
 
         return relationship, work
 
+    def replace(self, entity):
+        pass
+
     def delete(self, entity):
         response = self.relationship_query.delete(entity)
 
