@@ -463,6 +463,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
     entity_context = property(_get_entity_context, _set_entity_context,
         _delete_entity_context)
 
+    def get_work(self):
+        return Work(mapper=self.mapper)
+
     def data(self, entity):
         if isinstance(entity, Collection):
             return [self.data(e) for e in entity]

@@ -411,8 +411,28 @@ class RelatedEntity(object):
 
         return relationship, work
 
-    def replace(self, entity):
-        pass
+    def replace(self, entities=None, entity_ids=None, work=None):
+        from .mapper import _Unit, Work
+
+        if not entities or entities_ids:
+            msg = 'Either the entities or entity_ids must be defined'
+            raise AttributError(msg)
+        existing = self().send()
+        existing_ids = [e.id for e in existing]
+        work = work or self.mapper.get_work()
+
+        if existing_ids:
+            query, params = self.relationship_query.delete_by_entity_id(
+                existing_ids)
+            work.add_query(query=query, params=params)
+
+        if entity_ids:
+            entity_ids = map(int, entity_ids or [])
+        elif entities:
+            for entity in entities:
+                self.save(entity=entity, work=work)
+
+        return work
 
     def delete(self, entity):
         response = self.relationship_query.delete(entity)
@@ -421,8 +441,9 @@ class RelatedEntity(object):
 
         return response
 
-    def query(self, limit=None, skip=None, matches=None, wheres=None,
-              orders=None, returns=None, return_relationship=False, **kwargs):
+    def prepare(self, limit=None, skip=None, matches=None, wheres=None,
+                orders=None, returns=None, return_relationship=False,
+                **kwargs):
         limit = limit or self._limit
         skip = skip or self._skip
         matches = matches or self._matches
@@ -437,6 +458,15 @@ class RelatedEntity(object):
             + wheres
         self.relationship_query.orders = self.relationship_query.orders \
             + orders
+
+        return self
+
+    def query(self, limit=None, skip=None, matches=None, wheres=None,
+              orders=None, returns=None, return_relationship=False, **kwargs):
+        self.prepare(limit=limit, skip=skip, matches=matches, wheres=wheres,
+            orders=orders, returns=returns,
+            return_relationship=return_relationship)
+
         response = self.relationship_query.query(
             return_relationship=return_relationship, returns=returns)
 

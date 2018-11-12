@@ -528,6 +528,32 @@ class RelatedEntityQuery(_BaseQuery):
 
                 return str(self.pypher), self.pypher.bound_params
 
+    def delete_by_entity_id(self, *ids):
+        if not ids:
+            msg = 'There must be ids passed in to the delete method'
+            raise AttributeError(msg)
+
+        self.matches.insert(0, self._build_end())
+        self.matches.insert(0, self._build_relationship())
+        self.matches.insert(0, self._build_start())
+
+        self.pypher.MATCH
+
+        for match in self.matches:
+            self.pypher.append(match)
+
+        self.pypher.DELETE(self.relationship_query_variable)
+
+        id_params = []
+
+        for i in ids:
+            key = 'end_id_{}'.format(i)
+            id_params.append(Param(key, i))
+
+        self.pypher.WHERE.ID(self.end_query_variable).IN(**id_params)
+
+        return str(self.pypher), pypher.bound_params
+
 
 class QueryException(Exception):
     pass
