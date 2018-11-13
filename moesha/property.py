@@ -261,7 +261,12 @@ class RelatedManager(object):
         self.mapper = mapper
 
     def __call__(self, entity):
+        from .mapper import EQV
+
+
         for _, rel in self.relationships.items():
+            EQV.define(entity)
+            rel._original_query_variable = entity.query_variable
             rel.start_entity = entity
 
         return self
@@ -414,23 +419,32 @@ class RelatedEntity(object):
     def replace(self, entities=None, entity_ids=None, work=None):
         from .mapper import _Unit, Work
 
-        if not entities or entities_ids:
+
+        if not entities or entity_ids:
             msg = 'Either the entities or entity_ids must be defined'
-            raise AttributError(msg)
-        existing = self().send()
-        existing_ids = [e.id for e in existing]
+            raise AttributeError(msg)
+
         work = work or self.mapper.get_work()
 
-        if existing_ids:
+        if self._original_query_variable:
+            self.relationship_query.start_query_variable = self._original_query_variable
+
+        self.prepare()
+
+        existing = self()
+        existing_ids = [e.id for e in existing]
+
+
+        if existing_ids and self.start_entity.id:
             query, params = self.relationship_query.delete_by_entity_id(
-                existing_ids)
+                *existing_ids)
             work.add_query(query=query, params=params)
 
         if entity_ids:
             entity_ids = map(int, entity_ids or [])
         elif entities:
             for entity in entities:
-                self.save(entity=entity, work=work)
+                self.add(entity=entity, work=work)
 
         return work
 

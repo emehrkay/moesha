@@ -376,7 +376,7 @@ class RelatedEntityQuery(_BaseQuery):
 
     def _set_start_entity(self, entity):
         if entity is not None and not isinstance(entity, Node):
-            raise
+            raise AttributeError('entity must be a Node instance')
 
         if entity:
             entity.query_variable = self.start_query_variable
@@ -390,7 +390,7 @@ class RelatedEntityQuery(_BaseQuery):
 
     def _set_end_entity(self, entity):
         if entity is not None and not isinstance(entity, Node):
-            raise
+            raise AttributeError('entity must be a Node instance')
 
         if entity:
             entity.query_variable = self.end_query_variable
@@ -525,6 +525,7 @@ class RelatedEntityQuery(_BaseQuery):
                     self.pypher.append(match)
 
                 self.pypher.DETACH.DELETE(self.relationship_query_variable)
+                self.reset()
 
                 return str(self.pypher), self.pypher.bound_params
 
@@ -533,16 +534,31 @@ class RelatedEntityQuery(_BaseQuery):
             msg = 'There must be ids passed in to the delete method'
             raise AttributeError(msg)
 
+
+        def _build_start():
+            pypher = Pypher()
+
+            if self.start_entity.id:
+                qv = self.start_entity.query_variable
+                where = __.ID(qv) == self.start_entity.id
+
+                pypher.NODE(qv)
+                self.wheres.append(where)
+            else:
+                pypher.NODE(self.start_query_variable)
+
+            return pypher
+
+
+        self.pypher = Pypher()
         self.matches.insert(0, self._build_end())
         self.matches.insert(0, self._build_relationship())
-        self.matches.insert(0, self._build_start())
+        self.matches.insert(0, _build_start())
 
         self.pypher.MATCH
 
         for match in self.matches:
             self.pypher.append(match)
-
-        self.pypher.DELETE(self.relationship_query_variable)
 
         id_params = []
 
@@ -550,9 +566,19 @@ class RelatedEntityQuery(_BaseQuery):
             key = 'end_id_{}'.format(i)
             id_params.append(Param(key, i))
 
-        self.pypher.WHERE.ID(self.end_query_variable).IN(**id_params)
+        self.wheres.append(__.ID(self.end_query_variable).IN(*id_params))
+        _id = __.ID(self.start_query_variable)
 
-        return str(self.pypher), pypher.bound_params
+        if self.start_entity.id:
+            self.wheres.append(_id == self.start_entity.id)
+        # else:
+        #     wheres.append(_id)
+
+        self.pypher.WHERE.CAND(*self.wheres)
+        self.pypher.DELETE(self.relationship_query_variable)
+        self.reset()
+
+        return str(self.pypher), self.pypher.bound_params
 
 
 class QueryException(Exception):
@@ -589,7 +615,7 @@ class Builder(Pypher):
                 'Relationship').format(repr(entity))
             raise QueryBuilderException(msg)
 
-        if entity.id:
+        if entity.id is not None:
             self.WHERE(__.id(self.entity) == entity.id)
 
     def bind_param(self, value, name=None):
@@ -631,6 +657,28 @@ class Helpers(object):
         b.RETURN.DISTINCT(b.entity)
 
         return str(b), b.bound_params
+
+    def get_by_ids(self, entity, ids):
+        p = Pypher()
+        p.MATCH
+
+        if isinstance(entity, Relationship):
+            var = 'rel'
+            p.node().rel(var, labels=entity.labels).node()
+        else:
+            var = 'node'
+            p.node(var, labels=entity.labels)
+
+        id_params = []
+
+        for i in ids:
+            key = 'entity_id_{}'.format(i)
+            id_params.append(Param(key, i))
+
+        p.WHERE.COR(__.ID(var).IN(*id_params))
+        p.RETURN(var)
+
+        return str(p), p.bound_params
 
     def get_start(self, entity):
         b = Builder(entity)

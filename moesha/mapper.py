@@ -723,6 +723,21 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return result[0] if len(result) else None
 
+    def get_by_ids(self, ids, work=None):
+        def _get_by_ids(unit, ids=None):
+            helpers = Helpers()
+
+            return helpers.get_by_ids(entity=unit.entity, ids=ids)
+
+        if not work:
+            work = Work(mapper=self.mapper)
+
+        unit = _Unit(entity=self.entity(), action=_get_by_ids, mapper=self,
+            ids=ids, event_map=self._event_map)
+        work.add_unit(unit)
+
+        return work.send()
+
     def builder(self, entity=None, query_variable=None):
         entity = entity or self.entity()
 
@@ -874,6 +889,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
+        # print('*'*80)
+        # print(_query_debug(query, params))
+        # print(params)
+        # print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
