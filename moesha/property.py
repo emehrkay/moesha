@@ -427,7 +427,8 @@ class RelatedEntity(object):
         work = work or self.mapper.get_work()
 
         if self._original_query_variable:
-            self.relationship_query.start_query_variable = self._original_query_variable
+            self.relationship_query.start_query_variable =\
+                self._original_query_variable
 
         self.prepare()
 
