@@ -107,6 +107,8 @@ class PropertyManager(object):
             if prop not in self.properties:
                 self.properties[field] = prop
 
+            return prop
+
         return None
 
 
@@ -307,8 +309,15 @@ class RelatedEntity(object):
 
     def __init__(self, relationship_entity=None, relationship_type=None,
                  direction='out', mapper=None, ensure_unique=False):
+        from .entity import Relationship
+
         if not relationship_entity and not relationship_type:
-            raise Exception()
+            raise Exception('The relationship must have either a'
+                ' relationship_entity or a relationship_type defined')
+        elif relationship_entity and not issubclass(relationship_entity,
+            Relationship):
+            raise AttributeError('The related_entity must be a'
+            ' <Relationship> not a `{t}`'.format(t=relationship_entity))
 
         self.relationship_entity = relationship_entity
         self.relationship_type = relationship_type

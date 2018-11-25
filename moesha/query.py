@@ -371,6 +371,22 @@ class RelatedEntityQuery(_BaseQuery):
         if self.end_entity:
             self.end_entity.query_variable = None
 
+    def _get_relationship_entity(self):
+        return self._relationship_entity
+
+    def _set_relationship_entity(self, relationship):
+        if relationship is not None and not isinstance(relationship,
+            Relationship):
+            raise AttributeError('Must be an <Relationship> and not'
+                ' a <{t}>'.format(t=type(relationship)))
+
+        self._relationship_entity = relationship
+
+        return self
+
+    relationship_entity = property(_get_relationship_entity,
+        _set_relationship_entity)
+
     def _get_start_entity(self):
         return self._start_entity
 
