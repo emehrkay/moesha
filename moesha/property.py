@@ -376,12 +376,49 @@ class RelatedEntity(object):
         return self._start_entity
 
     def _set_start_entity(self, start):
+        from .mapper import EQV
+
+        EQV.define(start)
+        self.start = start.query_variable
+        self.rel = '{}_rel'.format(start.query_variable)
+        self.end = '{}_end'.format(start.query_variable)
         self._start_entity = start
         self.relationship_query.start_entity = start
 
         return self
 
     start_entity = property(_get_start_entity, _set_start_entity)
+
+    def _get_start(self):
+        return self.relationship_query.start_query_variable
+
+    def _set_start(self, start_query_variable):
+        self.relationship_query.start_query_variable = start_query_variable
+
+        return self
+
+    start = property(_get_start, _set_start)
+
+    def _get_rel(self):
+        return self.relationship_query.relationship_query_variable
+
+    def _set_rel(self, rel_query_variable):
+        self.relationship_query.relationship_query_variable =\
+            rel_query_variable
+
+        return self
+
+    rel = property(_get_rel, _set_rel)
+
+    def _get_end(self):
+        return self.relationship_query.end_query_variable
+
+    def _set_end(self, end_query_variable):
+        self.relationship_query.end_query_variable = end_query_variable
+
+        return self
+
+    end = property(_get_end, _set_end)
 
     def match(self, *matches):
         for m in matches:
