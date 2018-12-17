@@ -323,38 +323,264 @@ class MapperTests(unittest.TestCase):
         self.assertIn('CREATE', query[0][0])
         self.assertIn('MATCH', query[1][0])
 
-    def test_can_create_on_relationship_added_custom_event(self):
+    def test_can_create_on_relationship_added_start_mapper_custom_event(self):
         mapper = Mapper(TC)
+        entities = {
+            'start': {
+                'start': None,
+                'relationship': None,
+            }
+        }
+        updated = {
+            'start': 'start updated {}'.format(random()),
+        }
+        modified = {
+            'start': None,
+        }
 
-        class StartCustomNode(Node):
+        class Start_StartCustomNode(Node):
             pass
 
-        class EndCustomNode(Node):
+        class Start_EndCustomNode(Node):
             pass
 
-        class RelationshipCustomNode(Relationship):
+        class Start_RelationshipCustomNode(Relationship):
             pass
 
-        class RelationshipCustomNodeMapper(EntityRelationshipMapper):
-            entity = RelationshipCustomNode
+        class Start_RelationshipCustomNodeMapper(EntityRelationshipMapper):
+            entity = Start_RelationshipCustomNode
 
-        class StartCustomNodeMapper(EntityMapper):
-            entity = StartCustomNode
+        class Start_StartCustomNodeMapper(EntityMapper):
+            entity = Start_StartCustomNode
             __RELATIONSHIPS__ = {
                 'Other': RelatedEntity(
-                    relationship_entity=RelationshipCustomNode),
+                    relationship_entity=Start_RelationshipCustomNode),
             }
 
             def on_relationship_other_added(self, entity, relationship_entity,
                                             response, relationship_end,
                                             **kwargs):
-                import pudb; pu.db
+                nonlocal entities, updated, modified
+                modified['start'] = updated['start']
+                entities['start']['start'] = entity
+                entities['start']['relationship'] = relationship_entity
 
-        start = mapper.create(entity=StartCustomNode)
-        end = mapper.create(entity=EndCustomNode)
+        start = mapper.create(entity=Start_StartCustomNode)
+        end = mapper.create(entity=Start_EndCustomNode)
         start_mapper = mapper.get_mapper(start)
-        _, work = start_mapper(start)['Other'].add(end)
+        rel, work = start_mapper(start)['Other'].add(end)
         work.send()
+
+        self.assertEqual(modified['start'], updated['start'])
+        self.assertEqual(start, entities['start']['start'])
+        self.assertEqual(rel, entities['start']['relationship'])
+
+    def test_can_create_on_relationship_added_end_mapper_custom_event(self):
+        mapper = Mapper(TC)
+        entities = {
+            'end': {
+                'end': None,
+                'relationship': None,
+            }
+        }
+        updated = {
+            'end': 'end updated {}'.format(random()),
+        }
+        modified = {
+            'end': None,
+        }
+
+        class End_StartCustomNode(Node):
+            pass
+
+        class End_EndCustomNode(Node):
+            pass
+
+        class End_RelationshipCustomNode(Relationship):
+            pass
+
+        class End_RelationshipCustomNodeMapper(EntityRelationshipMapper):
+            entity = End_RelationshipCustomNode
+
+        class End_StartCustomNodeMapper(EntityMapper):
+            entity = End_StartCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=End_RelationshipCustomNode),
+            }
+
+        class End_EndCustomNodeMapper(EntityMapper):
+            entity = End_EndCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=End_RelationshipCustomNode),
+            }
+
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                nonlocal entities, updated, modified
+                modified['end'] = updated['end']
+                entities['end']['end'] = entity
+                entities['end']['relationship'] = relationship_entity
+
+        start = mapper.create(entity=End_StartCustomNode)
+        end = mapper.create(entity=End_EndCustomNode)
+        start_mapper = mapper.get_mapper(start)
+        rel, work = start_mapper(start)['Other'].add(end)
+        work.send()
+
+        self.assertEqual(modified['end'], updated['end'])
+        self.assertEqual(end, entities['end']['end'])
+        self.assertEqual(rel, entities['end']['relationship'])
+
+    def test_can_create_on_relationship_added_relationship_mapper_custom_event(self):
+        mapper = Mapper(TC)
+        entities = {
+            'relationship': {
+                'relationship': None,
+            }
+        }
+        updated = {
+            'relationship': 'relationship updated {}'.format(random()),
+        }
+        modified = {
+            'relationship': None,
+        }
+
+        class Relationship_StartCustomNode(Node):
+            pass
+
+        class Relationship_EndCustomNode(Node):
+            pass
+
+        class Relationship_RelationshipCustomNode(Relationship):
+            pass
+
+        class Relationship_RelationshipCustomNodeMapper(EntityRelationshipMapper):
+            entity = Relationship_RelationshipCustomNode
+
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                nonlocal entities, updated, modified
+                modified['relationship'] = updated['relationship']
+                entities['relationship']['relationship'] = entity
+                entities['relationship']['relationship'] = relationship_entity
+
+        class Relationship_StartCustomNodeMapper(EntityMapper):
+            entity = Relationship_StartCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=Relationship_RelationshipCustomNode),
+            }
+
+        class Relationship_EndCustomNodeMapper(EntityMapper):
+            entity = Relationship_EndCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=Relationship_RelationshipCustomNode),
+            }
+
+        start = mapper.create(entity=Relationship_StartCustomNode)
+        end = mapper.create(entity=Relationship_EndCustomNode)
+        start_mapper = mapper.get_mapper(start)
+        rel, work = start_mapper(start)['Other'].add(end)
+        work.send()
+
+        self.assertEqual(modified['relationship'], updated['relationship'])
+        self.assertEqual(rel, entities['relationship']['relationship'])
+
+    def test_can_create_on_relationship_added_all_mapper_custom_event(self):
+        mapper = Mapper(TC)
+        entities = {
+            'start': {
+                'start': None,
+                'relationship': None,
+            },
+            'end': {
+                'end': None,
+                'relationship': None,
+            },
+            'relationship': {
+                'relationship': None,
+            }
+        }
+        updated = {
+            'start': 'start updated {}'.format(random()),
+            'end': 'end updated {}'.format(random()),
+            'relationship': 'relationship updated {}'.format(random()),
+        }
+        modified = {
+            'start': None,
+            'end': None,
+            'relationship': None,
+        }
+
+        class All_StartCustomNode(Node):
+            pass
+
+        class All_EndCustomNode(Node):
+            pass
+
+        class All_RelationshipCustomNode(Relationship):
+            pass
+
+        class All_RelationshipCustomNodeMapper(EntityRelationshipMapper):
+            entity = All_RelationshipCustomNode
+
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                nonlocal entities, updated, modified
+                modified['relationship'] = updated['relationship']
+                entities['relationship']['relationship'] = entity
+                entities['relationship']['relationship'] = relationship_entity
+
+        class All_StartCustomNodeMapper(EntityMapper):
+            entity = All_StartCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=All_RelationshipCustomNode),
+            }
+            
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                nonlocal entities, updated, modified
+                modified['start'] = updated['start']
+                entities['start']['start'] = entity
+                entities['start']['relationship'] = relationship_entity
+
+        class All_EndCustomNodeMapper(EntityMapper):
+            entity = All_EndCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=All_RelationshipCustomNode),
+            }
+
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                nonlocal entities, updated, modified
+                modified['end'] = updated['end']
+                entities['end']['end'] = entity
+                entities['end']['relationship'] = relationship_entity
+
+        start = mapper.create(entity=All_StartCustomNode)
+        end = mapper.create(entity=All_EndCustomNode)
+        start_mapper = mapper.get_mapper(start)
+        rel, work = start_mapper(start)['Other'].add(end)
+        work.send()
+
+        self.assertEqual(modified['start'], updated['start'])
+        self.assertEqual(start, entities['start']['start'])
+        self.assertEqual(rel, entities['start']['relationship'])
+        self.assertEqual(modified['end'], updated['end'])
+        self.assertEqual(end, entities['end']['end'])
+        self.assertEqual(rel, entities['end']['relationship'])
+        self.assertEqual(modified['relationship'], updated['relationship'])
+        self.assertEqual(rel, entities['relationship']['relationship'])
 
 
 

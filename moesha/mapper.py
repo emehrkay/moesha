@@ -740,7 +740,12 @@ class EntityMapper(with_metaclass(_RootMapper)):
         with a name formatted like:
             on_relationship_$relationship_name_added (in lowercase)
         and its signature should be:
-            $event(entity, response, relationship_entity, relationship_end, **kwargs
+            $event(entity, response, relationship_entity, relationship_end, **kwargs)
+        custom methods can also be defined in the __init__ method by binding
+        them to the _relationship_added_handlers attribute. This is useful
+        when the name field does not directly map to a valid Python method
+        name, ie., {'on_relationship_has children_added`: self.some_method}
+        These method have the same signature as defined above
         """
         if isinstance(entity, Relationship):
 
@@ -762,6 +767,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
             relationship_entity = entity
 
+        # call the custom methods
         name = 'on_relationship_{}_added'.format(relationship_name).lower()
         events = []
 
