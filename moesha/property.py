@@ -467,7 +467,8 @@ class RelatedEntity(object):
         relationship = self.relationship_query.connect(entity=entity,
                 properties=properties)
         work = self.mapper.mapper.save(relationship,
-            ensure_unique=self.ensure_unique, work=work)
+            ensure_unique=self.ensure_unique, work=work,
+            relationship_name=self.relationship_name)
 
         return relationship, work
 

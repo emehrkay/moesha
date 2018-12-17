@@ -5,8 +5,10 @@ import time
 from random import random, randint
 
 from moesha.entity import (Node, Relationship)
-from moesha.property import (String, Integer, TimeStamp)
-from moesha.mapper import (Mapper, EntityMapper, get_mapper)
+from moesha.property import (String, Integer, TimeStamp,
+    RelatedEntity)
+from moesha.mapper import (Mapper, EntityMapper, get_mapper,
+    EntityRelationshipMapper)
 
 
 class TestConnection(object):
@@ -320,6 +322,40 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(2, len(query))
         self.assertIn('CREATE', query[0][0])
         self.assertIn('MATCH', query[1][0])
+
+    def test_can_create_on_relationship_added_custom_event(self):
+        mapper = Mapper(TC)
+
+        class StartCustomNode(Node):
+            pass
+
+        class EndCustomNode(Node):
+            pass
+
+        class RelationshipCustomNode(Relationship):
+            pass
+
+        class RelationshipCustomNodeMapper(EntityRelationshipMapper):
+            entity = RelationshipCustomNode
+
+        class StartCustomNodeMapper(EntityMapper):
+            entity = StartCustomNode
+            __RELATIONSHIPS__ = {
+                'Other': RelatedEntity(
+                    relationship_entity=RelationshipCustomNode),
+            }
+
+            def on_relationship_other_added(self, entity, relationship_entity,
+                                            response, relationship_end,
+                                            **kwargs):
+                import pudb; pu.db
+
+        start = mapper.create(entity=StartCustomNode)
+        end = mapper.create(entity=EndCustomNode)
+        start_mapper = mapper.get_mapper(start)
+        _, work = start_mapper(start)['Other'].add(end)
+        work.send()
+
 
 
 class MapperCreateTests(unittest.TestCase):

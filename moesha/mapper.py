@@ -150,12 +150,16 @@ class _Unit(object):
             event(self.entity)
 
     def execute_after_events(self, *args, **kwargs):
+        kwargs.update(self.kwargs)
+
         for event in self.after_events:
             event(self.entity, *args, **kwargs)
 
-    def execute_final_events(self):
+    def execute_final_events(self, **kwargs):
+        kwargs.update(**self.kwargs)
+
         for event in self.final_events:
-            event()
+            event(**kwargs)
 
     def describe(self):
 
@@ -246,10 +250,10 @@ class Work(object):
 
         return self
 
-    def save(self, *entities, ensure_unique=False):
+    def save(self, *entities, ensure_unique=False, **kwargs):
         for entity in entities:
             self.mapper.save(entity=entity, ensure_unique=ensure_unique,
-                work=self)
+                work=self, **kwargs)
 
         return self
 
@@ -409,21 +413,32 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self._entity_context = None
         self.__build__()
         self._property_change_handlers = {}
-        self._relationship_change_handlers = {}
+        self._relationship_added_handlers = {}
+        self._relationship_updated_handlers = {}
+        self._relationship_removed_handlers = {}
+        create_after = [self._refresh_entity, self.on_after_create,]
+        update_after = [self.on_properties_changed, self.on_after_update,]
+        delete_after = [self.on_after_delete,]
+
+        # only add the relationship events if the entity for this mapper
+        # is a Relationship
+        if self.entity and issubclass(self.entity, Relationship):
+            create_after.insert(1, self.on_relationship_added)
+            update_after.insert(1, self.on_relationship_updated)
+            delete_after.insert(0, self.on_relationship_removed)
+
         self._event_map = {
             self.CREATE: {
                 'before': [self.on_before_create,],
-                'after': [self._refresh_entity, self.on_relationship_added,
-                    self.on_after_create,],
+                'after': create_after,
             },
             self.UPDATE: {
                 'before': [self.on_before_update,],
-                'after': [self.on_properties_changed,
-                    self.on_relationship_updated, self.on_after_update,],
+                'after': update_after,
             },
             self.DELETE: {
                 'before': [self.on_before_delete,],
-                'after': [self.on_relationship_removed, self.on_after_delete,],
+                'after': delete_after,
             },
             self.FINAL: [self.reset],
         }
@@ -470,6 +485,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def get_work(self):
         return Work(mapper=self.mapper)
 
+    def get_mapper(self, entity):
+        return get_mapper(entity=entity, mapper=self.mapper)
+
     def data(self, entity):
         if isinstance(entity, Collection):
             return [self.data(e) for e in entity]
@@ -508,14 +526,15 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return entity
 
-    def save(self, entity, ensure_unique=False, work=None):
+    def save(self, entity, ensure_unique=False, work=None, **kwargs):
         if not work:
             work = Work(mapper=self.mapper)
 
         EQV.define(entity)
 
         unit = _Unit(entity=entity, action=self._save_entity, mapper=self,
-            event_map=self._event_map, ensure_unique=ensure_unique)
+            event_map=self._event_map, ensure_unique=ensure_unique,
+            **kwargs)
         work.add_unit(unit)
 
         return work
@@ -531,7 +550,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return work
 
-    def _save_entity(self, unit, ensure_unique=False):
+    def _save_entity(self, unit, ensure_unique=False, **kwargs):
         entity = unit.entity
         exists = bool(entity.id)
 
@@ -597,8 +616,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
                 for event in start_events['after']:
                     def bind_event(start_event):
-                        def after_event(entity, response=None):
-                            start_event(start, response)
+                        def after_event(entity, response=None, **ev_kwargs):
+                            ev_kwargs.update(**kwargs)
+                            start_event(start, response, **ev_kwargs)
 
                         afters.append(after_event)
 
@@ -606,8 +626,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
                 for event in end_events['after']:
                     def bind_after_event(end_event):
-                        def after_event(entity, response=None):
-                            end_event(end, response)
+                        def after_event(entity, response=None, **ev_kwargs):
+                            ev_kwargs.update(**kwargs)
+                            end_event(end, response, **ev_kwargs)
 
                         afters.append(after_event)
 
@@ -642,7 +663,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save(ensure_unique=ensure_unique)
 
-    def _delete_entity(self, unit, detach=True):
+    def _delete_entity(self, unit, detach=True, **kwargs):
         entity = unit.entity
         unit.event = EntityMapper.DELETE
         query = Query(entities=[entity,], params=self.mapper.params)
@@ -654,7 +675,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return query.save()
 
-    def _refresh_entity(self, entity, response):
+    def _refresh_entity(self, entity, response, **kwargs):
         for res in response.response.result_data:
             for var, node in res.items():
                 if var == entity.query_variable:
@@ -667,23 +688,24 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def on_before_create(self, entity):
         pass
 
-    def on_after_create(self, entity, response=None):
+    def on_after_create(self, entity, response=None, **kwargs):
         pass
 
-    def on_before_update(self, entity):
+    def on_before_update(self, entity, **kwargs):
         pass
 
-    def on_after_update(self, entity, response=None):
+    def on_after_update(self, entity, response=None, **kwargs):
         pass
 
-    def on_before_delete(self, entity):
+    def on_before_delete(self, entity, **kwargs):
         pass
 
-    def on_after_delete(self, entity, response=None):
+    def on_after_delete(self, entity, response=None, **kwargs):
         pass
 
-    def on_properties_changed(self, entity, response=None):
-        """This method checkes for changes in the entity's properties and will
+    def on_properties_changed(self, entity, response=None, **kwargs):
+        """
+        This method checkes for changes in the entity's properties and will
         run a method that will handle what should happen if it changed.
         for most properties, naming a method with the format
         `on_$property_changed` should be fine. But for property names that
@@ -706,13 +728,60 @@ class EntityMapper(with_metaclass(_RootMapper)):
                 method(entity=entity, field=field,
                     value_from=values['from'], value_to=values['to'])
 
-    def on_relationship_added(self, entity, response=None):
+    def on_relationship_added(self, entity, response=None,
+                              relationship_name=None, relationship_entity=None,
+                              relationship_end=None, **kwargs):
+        """
+        This method is used to fire off custom events when a relationship is
+        added. It will check the entity and if it is a Relationship, it will
+        call this method again for the both ends of the Relationship. It will
+        then evaluate the Mapper to see if has any custom events based on the
+        relationship_name argument. The custom event should be a method
+        with a name formatted like:
+            on_relationship_$relationship_name_added (in lowercase)
+        and its signature should be:
+            $event(entity, response, relationship_entity, relationship_end, **kwargs
+        """
+        if isinstance(entity, Relationship):
+
+            def trigger_relationship_event(other_entity, rel_end):
+                # if the other_entity is a Node object, we want to call this
+                # method again for its mapper, but also passing in the original
+                # Relationship entity
+                if isinstance(other_entity, Node):
+                    mapper = self.get_mapper(other_entity)
+                    mapper.on_relationship_added(entity=other_entity,
+                        response=response, relationship_name=relationship_name,
+                        relationship_entity=entity, relationship_end=rel_end,
+                        **kwargs)
+
+            trigger_relationship_event(other_entity=entity.start,
+                rel_end='start')
+            trigger_relationship_event(other_entity=entity.end,
+                rel_end='end')
+
+            relationship_entity = entity
+
+        name = 'on_relationship_{}_added'.format(relationship_name).lower()
+        events = []
+
+        if name in self._relationship_added_handlers:
+            events.append(self.__relationship_added_handlers[name])
+
+        method = getattr(self, name, None)
+
+        if method:
+            events.append(method)
+
+        for event in events:
+            event(entity=entity, response=response,
+                relationship_entity=relationship_entity,
+                relationship_end=relationship_end, **kwargs)
+
+    def on_relationship_updated(self, entity, response=None, **kwargs):
         pass
 
-    def on_relationship_updated(self, entity, response=None):
-        pass
-
-    def on_relationship_removed(self, entity, response=None):
+    def on_relationship_removed(self, entity, response=None, **kwargs):
         pass
 
     # Utility methods
@@ -853,7 +922,7 @@ class Mapper(object):
 
         return mapper.data(entity)
 
-    def save(self, *entities, ensure_unique=False, work=None):
+    def save(self, *entities, ensure_unique=False, work=None, **kwargs):
         if not work:
             work = Work(mapper=self)
 
@@ -861,7 +930,8 @@ class Mapper(object):
             work.remove_entity_unit(entity)
             mapper = self.get_mapper(entity)
 
-            mapper.save(entity=entity, ensure_unique=ensure_unique, work=work)
+            mapper.save(entity=entity, ensure_unique=ensure_unique, work=work,
+                **kwargs)
 
         return work
 
