@@ -279,6 +279,12 @@ class RelatedManager(object):
     def _set_relationships(self, relationships=None):
         self._relationships = relationships or {}
 
+        # bind the name of the relationship to the RelatedEntity
+        # the name is used when the running `on_relationship_$name_$action`
+        # callbacks in the Work objects
+        for name, rel in self._relationships.items():
+            rel.relationship_name = name
+
     relationships = property(_get_relationships, _set_relationships)
 
     def _get_mapper(self):
@@ -308,7 +314,8 @@ class RelatedManager(object):
 class RelatedEntity(object):
 
     def __init__(self, relationship_entity=None, relationship_type=None,
-                 direction='out', mapper=None, ensure_unique=False):
+                 direction='out', mapper=None, ensure_unique=False,
+                 relationship_name=None):
         from .entity import Relationship
 
         if not relationship_entity and not relationship_type:
@@ -323,7 +330,9 @@ class RelatedEntity(object):
         self.relationship_type = relationship_type
         self.direction = direction
         self.ensure_unique = ensure_unique
+        self.relationship_name = relationship_name
         self._start_entity = None
+        self._original_query_variable = None
         self.results = None
         self._mapper = mapper
         self._limit = None
@@ -463,9 +472,6 @@ class RelatedEntity(object):
         return relationship, work
 
     def replace(self, entities=None, entity_ids=None, work=None):
-        from .mapper import _Unit, Work
-
-
         if not entities or entity_ids:
             msg = 'Either the entities or entity_ids must be defined'
             raise AttributeError(msg)
@@ -479,13 +485,14 @@ class RelatedEntity(object):
         self.prepare()
 
         existing = self()
-        existing_ids = [e.id for e in existing]
+        # existing_ids = [e.id for e in existing]
 
-
-        if existing_ids and self.start_entity.id:
-            query, params = self.relationship_query.delete_by_entity_id(
-                *existing_ids)
-            work.add_query(query=query, params=params)
+        if len(existing) and self.start_entity.id:
+            # query, params = self.relationship_query.delete_by_entity_id(
+            #     *existing_ids)
+            # work.add_query(query=query, params=params)
+            for entity in existing:
+                self.delete(entity=entity, work=work)
 
         if entity_ids:
             entity_ids = map(int, entity_ids or [])
@@ -495,12 +502,13 @@ class RelatedEntity(object):
 
         return work
 
-    def delete(self, entity):
-        response = self.relationship_query.delete(entity)
+    def delete(self, entity, work=None):
+        work = work or self.mapper.get_work()
+        query, params = self.relationship_query.delete(entity=entity)
 
-        self.reset()
+        work.add_query(query=query, params=params)
 
-        return response
+        return work
 
     def prepare(self, limit=None, skip=None, matches=None, wheres=None,
                 orders=None, returns=None, return_relationship=False,

@@ -110,15 +110,15 @@ EQV = EntityQueryVariable
 class _Unit(object):
 
     def __init__(self, entity, action, mapper, event_map=None, event=None,
-                 **kwargs):
+                 before_events=None, after_events=None, **kwargs):
         self.entity = entity
         self.action = action
         self.mapper = mapper
         self.event_map = event_map or {}
         self._event = event
         self.kwargs = kwargs
-        self.before_events = []
-        self.after_events = []
+        self.before_events = before_events or []
+        self.after_events = after_events or []
         self.final_events = self.event_map.get('final', [])
         self.query = None
         self.params = None
@@ -134,8 +134,8 @@ class _Unit(object):
         self._event = event
 
         if event in self.event_map:
-            self.before_events = self.event_map[event]['before']
-            self.after_events = self.event_map[event]['after']
+            self.before_events += self.event_map[event]['before']
+            self.after_events += self.event_map[event]['after']
 
     event = property(_get_event, _set_event)
 
@@ -358,7 +358,8 @@ class _RootMapper(type):
 
         def __build__(self):
             self.properties = PropertyManager(properties=properties,
-                allow_undefined=bool(glob['undefined_props']), data_type='python')
+                allow_undefined=bool(glob['undefined_props']),
+                data_type='python')
             self.relationships = RelatedManager(mapper=self,
                 relationships=relationships,
                 allow_undefined=bool(glob['undefined_rels']))
@@ -408,20 +409,23 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self._entity_context = None
         self.__build__()
         self._property_change_handlers = {}
+        self._relationship_change_handlers = {}
         self._event_map = {
             self.CREATE: {
                 'before': [self.on_before_create,],
-                'after': [self._refresh_entity, self.on_after_create,],
+                'after': [self._refresh_entity, self.on_relationship_added,
+                    self.on_after_create,],
             },
             self.UPDATE: {
                 'before': [self.on_before_update,],
-                'after': [self.on_properties_changed, self.on_after_update,],
+                'after': [self.on_properties_changed,
+                    self.on_relationship_updated, self.on_after_update,],
             },
             self.DELETE: {
                 'before': [self.on_before_delete,],
-                'after': [self.on_after_delete,],
+                'after': [self.on_relationship_removed, self.on_after_delete,],
             },
-            self.FINAL: [self.reset]
+            self.FINAL: [self.reset],
         }
 
     def reset(self, *args, **kwargs):
@@ -701,6 +705,15 @@ class EntityMapper(with_metaclass(_RootMapper)):
             if method:
                 method(entity=entity, field=field,
                     value_from=values['from'], value_to=values['to'])
+
+    def on_relationship_added(self, entity, response=None):
+        pass
+
+    def on_relationship_updated(self, entity, response=None):
+        pass
+
+    def on_relationship_removed(self, entity, response=None):
+        pass
 
     # Utility methods
     def get_by_id(self, id_val=None, work=None):
