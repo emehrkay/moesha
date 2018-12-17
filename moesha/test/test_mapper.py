@@ -323,6 +323,9 @@ class MapperTests(unittest.TestCase):
         self.assertIn('CREATE', query[0][0])
         self.assertIn('MATCH', query[1][0])
 
+
+class MapperRelationshipEventTests(unittest.TestCase):
+
     def test_can_create_on_relationship_added_start_mapper_custom_event(self):
         mapper = Mapper(TC)
         entities = {
