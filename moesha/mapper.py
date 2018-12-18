@@ -834,6 +834,12 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return Builder(entity)
 
+    def refresh(self, entity):
+        if entity.id:
+            new = self.get_by_id(entity.id)
+            entity.hydrate(properties=new.data, reset=True)
+
+        return entity
 
 class EntityNodeMapper(EntityMapper):
     entity = Node
@@ -1000,6 +1006,11 @@ class Mapper(object):
         mapper = self.get_mapper(entity)
 
         return mapper.builder(entity=entity, query_variable=query_variable)
+
+    def refresh(self, entity):
+        mapper = self.get_mapper(entity)
+
+        return mapper.refresh(entity)
 
 
 class Response(Collection):

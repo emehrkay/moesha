@@ -23,3 +23,9 @@
     - [x] Raise exception when context is not set
 - [x] Build response object
     - [x] Build response collection that subclasses `entity.Collection`
+
+# Miscellany
+
+- [ ] Write documentation
+- [ ] Fix existing unit tests
+    - [ ] Add new tests to acheive 100% coverage
