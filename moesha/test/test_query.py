@@ -287,7 +287,6 @@ class RelatedEntityQueryTests(unittest.TestCase):
             properties={'since': since2})
         q = Query([rel, rel2])
         query, params = q.save()
-
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"

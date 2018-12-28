@@ -7,6 +7,7 @@ class Entity(object):
 
     def __init__(self, id=None, labels=None, properties=None):
         properties = properties or {}
+        self.query_variable = ''
         self.id = id
         self._data = {}
         self._initial = {}
