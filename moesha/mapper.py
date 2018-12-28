@@ -841,6 +841,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return entity
 
+
 class EntityNodeMapper(EntityMapper):
     entity = Node
 

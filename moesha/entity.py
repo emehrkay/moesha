@@ -85,7 +85,8 @@ class Entity(object):
         return self
 
     def __eq__(self, entity):
-        return (self.id == entity.id and self.labels == entity.labels)
+        return (self.id == entity.id and self.labels == entity.labels and
+            self.data == entity.data)
 
 
 class Node(Entity):

@@ -155,7 +155,7 @@ class Query(_BaseQuery):
 
     def update_node(self, entity):
         props = self._properties(entity)
-        qv = entity.query_variable
+        qv = VM.set_query_var(entity)
 
         for field, value in props.items():
             stmt = getattr(__, qv).property(field)._

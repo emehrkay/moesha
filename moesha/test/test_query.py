@@ -5,7 +5,7 @@ from random import random, randint
 from moesha.entity import (Node, Relationship)
 from moesha.query import (Query, RelatedEntityQuery, QueryException,
     RelatedQueryException)
-from moesha.mapper import (Mapper)
+from moesha.mapper import (Mapper, EntityMapper)
 
 
 def get_dict_key(dict, value):
@@ -16,11 +16,29 @@ def get_dict_key(dict, value):
     return None
 
 
+class OpenNode(Node):
+    labels = ['Node',]
+
+
+class OpenNodeMapper(EntityMapper):
+    entity = OpenNode
+    __ALLOW_UNDEFINED_PROPERTIES__ = True
+
+
+class OpenRelationship(Relationship):
+    labels = ['Relationship',]
+
+
+class OpenRelationshipMapper(EntityMapper):
+    entity = OpenRelationship
+    __ALLOW_UNDEFINED_PROPERTIES__ = True
+
+
 class NodeQueryTests(unittest.TestCase):
 
     def test_can_build_single_node_create_query(self):
         name = 'mark {}'.format(random())
-        n = Node(properties={'name': name})
+        n = OpenNode(properties={'name': name})
         q = Query(n)
         query, params = q.save()
         exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
@@ -31,9 +49,9 @@ class NodeQueryTests(unittest.TestCase):
 
     def test_can_build_mutiple_node_create_query(self):
         name = 'mark {}'.format(random())
-        n = Node(properties={'name': name})
+        n = OpenNode(properties={'name': name})
         name2 = 'mark {}'.format(random())
-        n2 = Node(properties={'name': name2})
+        n2 = OpenNode(properties={'name': name2})
         q = Query([n, n2])
         query, params = q.save()
         exp = 'CREATE ({var} {{`name`: ${val}}}), ({var2} {{`name`: ${val2}}}) RETURN {var}, {var2}'.format(
@@ -46,7 +64,7 @@ class NodeQueryTests(unittest.TestCase):
     def test_can_build_single_node_update_query(self):
         name = 'mark {}'.format(random())
         _id = 999
-        n = Node(id=_id, properties={'name': name})
+        n = OpenNode(id=_id, properties={'name': name})
         q = Query(n)
         query, params = q.save()
         exp = "MATCH ({var}) WHERE id({var}) = ${id} SET {var}.`name` = ${val} RETURN {var}".format(
@@ -59,10 +77,10 @@ class NodeQueryTests(unittest.TestCase):
     def test_can_build_multiple_node_update_query(self):
         name = 'mark {}'.format(random())
         _id = 999
-        n = Node(id=_id, properties={'name': name})
+        n = OpenNode(id=_id, properties={'name': name})
         name2 = 'kram {}'.format(random())
         _id2 = 888
-        n2 = Node(id=_id2, properties={'name': name2})
+        n2 = OpenNode(id=_id2, properties={'name': name2})
         q = Query([n, n2])
         query, params = q.save()
         exp = "MATCH ({var}) WHERE id({var}) = ${id} MATCH ({var2}) WHERE id({var2}) = ${id2} SET {var}.`name` = ${val}, {var2}.`name` = ${val2} RETURN {var}, {var2}".format(
@@ -153,18 +171,18 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_single_create_relationship_with_existing_nodes_create_query(self):
         sid = 99
         n = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': n})
+        start = OpenNode(id=sid, properties={'name': n})
         eid = 88
         n2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': n2})
+        end = OpenNode(id=eid, properties={'name': n2})
         since = 'yeserday'
-        rel = Relationship(start=start, end=end, properties={'since': since})
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
-            " CREATE ({var})-[{var3}:`{label}` {{`since`: ${since}}}]->({var2})"
+            " CREATE ({var})-[{var3} {{`since`: ${since}}}]->({var2})"
             " SET {var}.`name` = ${val1}, {var2}.`name` = ${val2}"
             " RETURN {var}, {var2}, {var3}").format(var=start.query_variable,
                 var2=end.query_variable, var3=rel.query_variable, label=label,
@@ -177,15 +195,15 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
     def test_can_build_single_create_relationship_with_two_new_nodes_create_query(self):
         n = 'mark {}'.format(random())
-        start = Node(properties={'name': n})
+        start = OpenNode(properties={'name': n})
         n2 = 'kram {}'.format(random())
-        end = Node(properties={'name': n2})
+        end = OpenNode(properties={'name': n2})
         since = 'yeserday'
-        rel = Relationship(start=start, end=end, properties={'since': since})
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
-        import pudb; pu.db
         query, params = q.save()
         label = rel.type
+
         exp = ("CREATE ({var} {{`name`: ${name}}})-[{rel} {{`since`: ${since}}}]->({var2} {{`name`: ${name2}}})"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
                 rel=rel.query_variable, label='Relationship',
@@ -198,16 +216,16 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_single_create_relationship_with_one_existing_one_new_node_create_query(self):
         sid = 99
         n = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': n})
+        start = OpenNode(id=sid, properties={'name': n})
         n2 = 'kram {}'.format(random())
-        end = Node(properties={'name': n2})
+        end = OpenNode(properties={'name': n2})
         since = 'yeserday'
-        rel = Relationship(start=start, end=end, properties={'since': since})
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
-            " CREATE ({var})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`Node` {{`name`: ${name2}}})"
+            " CREATE ({var})-[{rel} {{`since`: ${since}}}]->({var2} {{`name`: ${name2}}})"
             " SET {var}.`name` = ${name}"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
                 id=get_dict_key(params, sid),
@@ -221,21 +239,21 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_single_create_multiple_relationship_with_the_same_existing_nodes_create_query(self):
         sid = 99
         n = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': n})
+        start = OpenNode(id=sid, properties={'name': n})
         eid = 88
         n2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': n2})
+        end = OpenNode(id=eid, properties={'name': n2})
         since = 'yeserday'
         label2 = 'knows_two'
-        rel = Relationship(start=start, end=end, properties={'since': since})
-        rel2 = Relationship(start=start, end=end, labels=label2, properties={'since': since})
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        rel2 = OpenRelationship(start=start, end=end, labels=label2, properties={'since': since})
         q = Query([rel, rel2])
         query, params = q.save()
 
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
-            " CREATE ({var})-[{var3}:`{label}` {{`since`: ${since}}}]->({var2}),"
+            " CREATE ({var})-[{var3} {{`since`: ${since}}}]->({var2}),"
             " ({var})-[{var4}:`{label2}` {{`since`: ${since}}}]->({var2})"
             " SET {var}.`name` = ${val1}, {var2}.`name` = ${val2}"
             " RETURN {var}, {var2}, {var3}, {var4}").format(var=start.query_variable,
@@ -251,21 +269,21 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_single_create_multiple_relationship_with_different_existing_nodes_create_query(self):
         sid = 99
         name = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': name})
+        start = OpenNode(id=sid, properties={'name': name})
         eid = 88
         name2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': name2})
+        end = OpenNode(id=eid, properties={'name': name2})
         sid2 = 999
         name3 = 'mark {}'.format(random())
-        start2 = Node(id=sid2, properties={'name': name3})
+        start2 = OpenNode(id=sid2, properties={'name': name3})
         eid2 = 888
         name4 = 'kram {}'.format(random())
-        end2 = Node(id=eid2, properties={'name': name4})
+        end2 = OpenNode(id=eid2, properties={'name': name4})
         since = 'yeserday'
         since2 = 'some time ago'
         label2 = 'knows_two'
-        rel = Relationship(start=start, end=end, properties={'since': since})
-        rel2 = Relationship(start=start2, end=end2, labels=label2,
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        rel2 = OpenRelationship(start=start2, end=end2, labels=label2,
             properties={'since': since2})
         q = Query([rel, rel2])
         query, params = q.save()
@@ -275,7 +293,7 @@ class RelatedEntityQueryTests(unittest.TestCase):
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var3}) WHERE id({var3}) = ${id3}"
             " MATCH ({var4}) WHERE id({var4}) = ${id4}"
-            " CREATE ({var})-[{rel}:`Relationship` {{`since`: ${since}}}]->({var2}),"
+            " CREATE ({var})-[{rel} {{`since`: ${since}}}]->({var2}),"
             " ({var3})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
             " SET {var}.`name` = ${name}, {var2}.`name` = ${name2}, {var3}.`name` = ${name3}, {var4}.`name` = ${name4}"
             " RETURN {var}, {var2}, {rel}, {var3}, {var4}, {rel2}").format(
@@ -294,20 +312,20 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
     def test_can_build_single_create_multiple_relationship_with_different_existing_and_new_nodes_create_query(self):
         name = 'mark {}'.format(random())
-        start = Node(properties={'name': name})
+        start = OpenNode(properties={'name': name})
         eid = 88
         name2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': name2})
+        end = OpenNode(id=eid, properties={'name': name2})
         name3 = 'mark {}'.format(random())
-        start2 = Node(properties={'name': name3})
+        start2 = OpenNode(properties={'name': name3})
         eid2 = 888
         name4 = 'kram {}'.format(random())
-        end2 = Node(id=eid2, properties={'name': name4})
+        end2 = OpenNode(id=eid2, properties={'name': name4})
         since = 'yeserday'
         since2 = 'some time ago'
         label2 = 'knows_two'
-        rel = Relationship(start=start, end=end, properties={'since': since})
-        rel2 = Relationship(start=start2, end=end2, labels=label2,
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        rel2 = OpenRelationship(start=start2, end=end2, labels=label2,
             properties={'since': since2})
         q = Query([rel, rel2])
         query, params = q.save()
@@ -315,8 +333,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
         label = rel.type
         exp = ("MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var4}) WHERE id({var4}) = ${id4}"
-            " CREATE ({var}:`Node` {{`name`: ${name}}})-[{rel}:`Relationship` {{`since`: ${since}}}]->({var2}),"
-            " ({var3}:`Node` {{`name`: ${name3}}})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
+            " CREATE ({var} {{`name`: ${name}}})-[{rel} {{`since`: ${since}}}]->({var2}),"
+            " ({var3} {{`name`: ${name3}}})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
             " SET {var2}.`name` = ${name2}, {var4}.`name` = ${name4}"
             " RETURN {var}, {var2}, {rel}, {var3}, {var4}, {rel2}").format(
                 var=start.query_variable,
@@ -335,13 +353,13 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_single_update_query(self):
         sid = 99
         name = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': name})
+        start = OpenNode(id=sid, properties={'name': name})
         eid = 88
         name2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': name2})
+        end = OpenNode(id=eid, properties={'name': name2})
         rid = 447788
         since = 'since {}'.format(random())
-        rel = Relationship(id=rid, start=start, end=end, properties={'since': since})
+        rel = OpenRelationship(id=rid, start=start, end=end, properties={'since': since})
         q = Query(rel)
         query, params = q.save()
 
@@ -362,27 +380,27 @@ class RelatedEntityQueryTests(unittest.TestCase):
     def test_can_build_mixed_update_and_insert_query(self):
         sid = 99
         name = 'mark {}'.format(random())
-        start = Node(id=sid, properties={'name': name})
+        start = OpenNode(id=sid, properties={'name': name})
         eid = 88
         name2 = 'kram {}'.format(random())
-        end = Node(id=eid, properties={'name': name2})
+        end = OpenNode(id=eid, properties={'name': name2})
         rid = 447788
         since = 'since {}'.format(random())
-        rel = Relationship(id=rid, start=start, end=end, properties={'since': since})
+        rel = OpenRelationship(id=rid, start=start, end=end, properties={'since': since})
         sid2 = 887
         name3 = 'name {}'.format(random())
-        start2 = Node(id=sid2, properties={'name': name3})
+        start2 = OpenNode(id=sid2, properties={'name': name3})
         name4 = 'name {}'.format(random())
-        end2 = Node(properties={'name': name4})
-        rel2 = Relationship(start=start2, end=end2, properties={'since': since})
+        end2 = OpenNode(properties={'name': name4})
+        rel2 = OpenRelationship(start=start2, end=end2, properties={'since': since})
         q = Query([rel, rel2])
         query, params = q.save()
 
         exp = ("MATCH ({start}) WHERE id({start}) = ${sid}"
             " MATCH ({end}) WHERE id({end}) = ${eid}"
-            " MATCH ({start})-[{rel}:`{label}`]->({end}) WHERE id({rel}) = ${rid}"
+            " MATCH ({start})-[{rel}]->({end}) WHERE id({rel}) = ${rid}"
             " MATCH ({start2}) WHERE id({start2}) = ${sid2}"
-            " CREATE ({start2})-[{rel2}:`{label}` {{`since`: ${since}}}]->({end2}:`Node` {{`name`: ${name4}}})"
+            " CREATE ({start2})-[{rel2} {{`since`: ${since}}}]->({end2} {{`name`: ${name4}}})"
             " SET {start}.`name` = ${name}, {end}.`name` = ${name2}, {rel}.`since` = ${since}, {start2}.`name` = ${name3}"
             " RETURN {start}, {end}, {rel}, {start2}, {end2}, {rel2}".format(start=start.query_variable,
                 sid=get_dict_key(params, sid), end=end.query_variable,
