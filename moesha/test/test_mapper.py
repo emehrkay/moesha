@@ -110,6 +110,9 @@ class MapperTests(unittest.TestCase):
         class MyNodeXXXMapper(EntityMapper):
             entity = MyNodeXXX
             __ALLOW_UNDEFINED__ = True
+            __PROPERTIES__ = {
+                'name': String(),
+            }
 
         mapper = Mapper(TC)
         name = 'name{}'.format(random())
@@ -228,7 +231,7 @@ class MapperTests(unittest.TestCase):
             def on_before_update(self, entity):
                 self.before_update = self.updated_before
 
-            def on_after_update(self, entity, response):
+            def on_after_update(self, entity, response, **kwargs):
                 self.after_update = self.updated_after
 
         mn = mapper.create(entity=MyNode3, id=999)
@@ -258,7 +261,7 @@ class MapperTests(unittest.TestCase):
             def on_before_delete(self, entity):
                 self.before_delete = self.deleted_before
 
-            def on_after_delete(self, entity, response):
+            def on_after_delete(self, entity, response, **kwargs):
                 self.after_delete = self.deleted_after
 
         mn = mapper.create(entity=MyNode4, id=999)
@@ -288,7 +291,7 @@ class MapperTests(unittest.TestCase):
             def on_before_delete(self, entity):
                 self.before_delete = self.deleted_before
 
-            def on_after_delete(self, entity, response):
+            def on_after_delete(self, entity, response, **kwargs):
                 self.after_delete = self.deleted_after
 
             def on_before_create(self, entity):
@@ -601,12 +604,13 @@ class MapperCreateTests(unittest.TestCase):
         name = 'mark {}'.format(random())
         p = {'name': name}
         n = Node(properties=p)
-
         work = self.mapper.save(n)
         queries = work.queries()
         query, params = queries[0]
 
-        self.assertEqual(1, len(params))
+        # generic Node and Relationship entites do not allow for setting of
+        # undefined properties
+        self.assertEqual(0, len(params))
         self.assertEqual(1, len(queries))
         self.assertTrue(query.startswith('CREATE'))
 
@@ -647,9 +651,18 @@ class MapperUpdateTests(unittest.TestCase):
         self.mapper = Mapper(TC)
 
     def test_can_udpate_single_node(self):
+        class SingleUpdate(Node):
+            pass
+
+        class SingleUpdateMapper(EntityMapper):
+            entity = SingleUpdate
+            __PROPERTIES__ = {
+                'name': String(),
+            }
+
         id = 999
         name = 'some name'
-        n = Node(id=id)
+        n = SingleUpdate(id=id)
         n['name'] = name
         work = self.mapper.save(n)
         query = work.queries()
@@ -662,14 +675,23 @@ class MapperUpdateTests(unittest.TestCase):
         self.assertIn(id, params.values())
 
     def test_can_update_multiple_nodes(self):
+        class SingleUpdate(Node):
+            pass
+
+        class SingleUpdateMapper(EntityMapper):
+            entity = SingleUpdate
+            __PROPERTIES__ = {
+                'name': String(),
+            }
+
         id = 999
         name = 'some name'
-        n = Node(id=id)
+        n = SingleUpdate(id=id)
         n['name'] = name
 
         id2 = 9992
         name2 = 'some name222'
-        n2 = Node(id=id2)
+        n2 = SingleUpdate(id=id2)
         n2['name'] = name2
         work = self.mapper.save(n)
         self.mapper.save(n2, work=work)
@@ -684,17 +706,33 @@ class MapperUpdateTests(unittest.TestCase):
         self.assertIn(id2, query[1][1].values())
 
     def test_can_update_single_relationship(self):
+
+        class SingleUpdate(Node):
+            pass
+
+        class SingleUpdateMapper(EntityMapper):
+            entity = SingleUpdate
+            __PROPERTIES__ = {
+                'name': String(),
+            }
+
+        class SingleRelationship(Relationship):
+            pass
+
+        class SingleRelationshipMapper(EntityMapper):
+            entity = SingleRelationship
+
         id = 999
         name = 'some name'
-        n = Node(id=id)
+        n = SingleUpdate(id=id)
         n['name'] = name
 
         id2 = 9992
         name2 = 'some name222'
-        n2 = Node(id=id2)
+        n2 = SingleUpdate(id=id2)
         n2['name'] = name2
         rid = 9988
-        rel = Relationship(start=n, end=n2, id=rid)
+        rel = SingleRelationship(start=n, end=n2, id=rid)
         work = self.mapper.save(rel)
         query = work.queries()
 
@@ -707,29 +745,45 @@ class MapperUpdateTests(unittest.TestCase):
         self.assertIn(rid, query[0][1].values())
 
     def test_can_update_multiple_relationships(self):
+    
+        class SingleUpdate(Node):
+            pass
+
+        class SingleUpdateMapper(EntityMapper):
+            entity = SingleUpdate
+            __PROPERTIES__ = {
+                'name': String(),
+            }
+
+        class SingleRelationship(Relationship):
+            pass
+
+        class SingleRelationshipMapper(EntityMapper):
+            entity = SingleRelationship
+
         id = 999
         name = 'some name'
-        n = Node(id=id)
+        n = SingleUpdate(id=id)
         n['name'] = name
 
         id2 = 9992
         name2 = 'some name222'
-        n2 = Node(id=id2)
+        n2 = SingleUpdate(id=id2)
         n2['name'] = name2
         rid = 9988
-        rel = Relationship(start=n, end=n2, id=rid)
+        rel = SingleRelationship(start=n, end=n2, id=rid)
 
         id3 = 997
         name3 = 'some name ed'
-        n3 = Node(id=id3)
+        n3 = SingleUpdate(id=id3)
         n3['name'] = name3
 
         id4 = 99929
         name4 = 'some name222 3'
-        n4 = Node(id=id4)
+        n4 = SingleUpdate(id=id4)
         n4['name'] = name4
         rid2 = 99887
-        rel2 = Relationship(start=n3, end=n4, id=rid2)
+        rel2 = SingleRelationship(start=n3, end=n4, id=rid2)
 
         work = self.mapper.save(rel)
         self.mapper.save(rel2, work=work)
