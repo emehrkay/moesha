@@ -472,11 +472,13 @@ class RelatedEntity(object):
 
         return relationship, work
 
-    def replace(self, entities=None, entity_ids=None, work=None):
+    def replace(self, entities=None, entity_ids=None, properties=None,
+                work=None):
         if not entities or entity_ids:
             msg = 'Either the entities or entity_ids must be defined'
             raise AttributeError(msg)
 
+        properties = properties or []
         work = work or self.mapper.get_work()
 
         if self._original_query_variable:
@@ -485,7 +487,7 @@ class RelatedEntity(object):
 
         self.prepare()
 
-        existing = self()
+        existing = self(return_relationship=True)
         # existing_ids = [e.id for e in existing]
 
         if len(existing) and self.start_entity.id:
@@ -498,8 +500,13 @@ class RelatedEntity(object):
         if entity_ids:
             entity_ids = map(int, entity_ids or [])
         elif entities:
-            for entity in entities:
-                self.add(entity=entity, work=work)
+            for i, entity in enumerate(entities):
+                try:
+                    props = properties[i]
+                except:
+                    props = {}
+
+                self.add(entity=entity, work=work, properties=props)
 
         return work
 
