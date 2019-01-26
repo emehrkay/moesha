@@ -476,12 +476,13 @@ class RelatedEntity(object):
         return relationship, work
 
     def replace(self, entities, properties=None, work=None):
+        from moesha.entity import Collection
+
+
         properties = properties or []
         work = work or self.mapper.get_work()
 
-        try:
-            iter(entities)
-        except:
+        if not isinstance(entities, (Collection, list, set, tuple)):
             entities = [entities,]
 
         if self._original_query_variable:
@@ -491,12 +492,8 @@ class RelatedEntity(object):
         self.prepare()
 
         existing = self(return_relationship=True)
-        # existing_ids = [e.id for e in existing]
 
         if len(existing) and self.start_entity.id:
-            # query, params = self.relationship_query.delete_by_entity_id(
-            #     *existing_ids)
-            # work.add_query(query=query, params=params)
             for entity in existing:
                 self.delete(entity=entity, work=work)
 
