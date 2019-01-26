@@ -273,6 +273,9 @@ class RelatedManager(object):
 
         return self
 
+    def __contains__(self, relationship):
+        return relationship in self.relationships
+
     def _get_relationships(self):
         return self._relationships
 
@@ -472,14 +475,14 @@ class RelatedEntity(object):
 
         return relationship, work
 
-    def replace(self, entities=None, entity_ids=None, properties=None,
-                work=None):
-        if not entities or entity_ids:
-            msg = 'Either the entities or entity_ids must be defined'
-            raise AttributeError(msg)
-
+    def replace(self, entities, properties=None, work=None):
         properties = properties or []
         work = work or self.mapper.get_work()
+
+        try:
+            iter(entities)
+        except:
+            entities = [entities,]
 
         if self._original_query_variable:
             self.relationship_query.start_query_variable =\
@@ -497,16 +500,13 @@ class RelatedEntity(object):
             for entity in existing:
                 self.delete(entity=entity, work=work)
 
-        if entity_ids:
-            entity_ids = map(int, entity_ids or [])
-        elif entities:
-            for i, entity in enumerate(entities):
-                try:
-                    props = properties[i]
-                except:
-                    props = {}
+        for i, entity in enumerate(entities):
+            try:
+                props = properties[i]
+            except:
+                props = {}
 
-                self.add(entity=entity, work=work, properties=props)
+            self.add(entity=entity, work=work, properties=props)
 
         return work
 

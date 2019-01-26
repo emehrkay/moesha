@@ -454,6 +454,9 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
+    def __contains__(self, relationship):
+        return relationship in self.relationships
+
     def __build__(self):
         pass
 
