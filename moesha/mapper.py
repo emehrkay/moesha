@@ -934,6 +934,9 @@ class Mapper(object):
         return get_mapper(entity=entity, mapper=self)
 
     def data(self, entity):
+        if isinstance(entity, Collection):
+            return [self.data(e) for e in entity]
+
         mapper = self.get_mapper(entity)
 
         return mapper.data(entity)
@@ -972,11 +975,18 @@ class Mapper(object):
             labels=labels, entity_type=entity_type, start=start, end=end,
             data_type=data_type)
 
-    def get_by_id(self, entity=None, id_val=None):
+    def get_by_id(self, entity=None, id_val=None, work=None):
         entity = entity or Node
+        work = work or self.get_work()
         mapper = self.get_mapper(entity=entity)
 
         return mapper.get_by_id(id_val=id_val)
+
+    def get_by_ids(self, ids, entity=None, work=None):
+        entity = entity or Node
+        mapper = self.get_mapper(entity)
+
+        return mapper.get_by_ids(ids=ids, work=work)
 
     def query(self, pypher=None, query=None, params=None):
         if pypher:
