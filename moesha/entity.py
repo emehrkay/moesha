@@ -13,7 +13,10 @@ class Entity(object):
         self._initial = {}
         self._changes = {}
         self._deleted = []
-        self.labels = labels or []
+
+        # call the method directly, seems to be an issue with properties
+        # and subclasses
+        self._set_labels(labels or [])
 
         self.hydrate(properties=properties, reset=True)
 

@@ -19,7 +19,7 @@ def get_dict_key(dict, value):
 
 
 class OpenNode(Node):
-    labels = ['Node',]
+    _labels = ['Node',]
 
 
 class OpenNodeMapper(EntityMapper):
@@ -28,7 +28,7 @@ class OpenNodeMapper(EntityMapper):
 
 
 class OpenRelationship(Relationship):
-    labels = ['Relationship',]
+    _labels = ['Relationship',]
 
 
 class OpenRelationshipMapper(EntityMapper):
@@ -55,24 +55,55 @@ class NodeQueryTests(unittest.TestCase):
         n = OpenNode(properties={'name': name})
         q = Query(n)
         query, params = q.save()
-        exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
-            var=n.query_variable, val=get_dict_key(params, name))
+        exp = 'CREATE ({var}:`{labels}` {{`name`: ${val}}}) RETURN {var}'.format(
+            var=n.query_variable, val=get_dict_key(params, name), labels=n.labels[0])
 
         self.assertEqual(exp, query)
         self.assertEqual(1, len(params))
 
-    def test_can_build_single_node_with_unique_properties_create_query(self):
+    def test_can_build_single_node_with_one_unique_property_create_query(self):
         name = 'mark {}'.format(random())
-        n = UniquePropertiesNode(properties={'name': name})
+        loc = 'loc {}'.format(random())
+        n = UniquePropertiesNode(properties={'name': name, 'location': loc})
         q = Query(n)
         query, params = q.save()
-        import pudb; pu.db
-        print(_query_debug(query, params))
-        exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
-            var=n.query_variable, val=get_dict_key(params, name))
+        exp = ('MERGE ({var}:`{label}` {{`name`: ${name_val}}})'
+            ' ON CREATE SET {var}.`location` = ${loc_val}, {var}.`name` = ${name_val}'
+            ' ON MATCH SET {var}.`location` = ${loc_val}, {var}.`name` = ${name_val}'
+            ' RETURN {var}').format(
+            var=n.query_variable, name_val=get_dict_key(params, name),
+            loc_val=get_dict_key(params, loc), label=n.labels[0])
 
         self.assertEqual(exp, query)
-        self.assertEqual(1, len(params))
+        self.assertEqual(2, len(params))
+
+    def test_can_build_single_node_with_multiple_unique_properties_create_query(self):
+
+        class UniqueMultiplePropertiesNode(Node):
+            pass
+
+
+        class UniqueMultiplePropertiesNodeMapper(EntityMapper):
+            entity = UniqueMultiplePropertiesNode
+            __PROPERTIES__ = {
+                'name': String(ensure_unique=True),
+                'location': String(ensure_unique=True),
+            }
+
+        name = 'mark {}'.format(random())
+        loc = 'loc {}'.format(random())
+        n = UniqueMultiplePropertiesNode(properties={'name': name, 'location': loc})
+        q = Query(n)
+        query, params = q.save()
+        exp = ('MERGE ({var}:`{label}` {{`location`: ${loc_val}, `name`: ${name_val}}})'
+            ' ON CREATE SET {var}.`location` = ${loc_val}, {var}.`name` = ${name_val}'
+            ' ON MATCH SET {var}.`location` = ${loc_val}, {var}.`name` = ${name_val}'
+            ' RETURN {var}').format(
+            var=n.query_variable, name_val=get_dict_key(params, name),
+            loc_val=get_dict_key(params, loc), label=n.labels[0])
+
+        self.assertEqual(exp, query)
+        self.assertEqual(2, len(params))
 
     def test_can_build_mutiple_node_create_query(self):
         name = 'mark {}'.format(random())
@@ -81,9 +112,10 @@ class NodeQueryTests(unittest.TestCase):
         n2 = OpenNode(properties={'name': name2})
         q = Query([n, n2])
         query, params = q.save()
-        exp = 'CREATE ({var} {{`name`: ${val}}}), ({var2} {{`name`: ${val2}}}) RETURN {var}, {var2}'.format(
+        exp = 'CREATE ({var}:`{var_label}` {{`name`: ${val}}}), ({var2}:`{var2_label}` {{`name`: ${val2}}}) RETURN {var}, {var2}'.format(
             var=n.query_variable, val=get_dict_key(params, name),
-            var2=n2.query_variable, val2=get_dict_key(params, name2))
+            var2=n2.query_variable, val2=get_dict_key(params, name2),
+            var_label=n.labels[0], var2_label=n2.labels[0])
 
         self.assertEqual(exp, query)
         self.assertEqual(2, len(params))
@@ -209,13 +241,38 @@ class RelatedEntityQueryTests(unittest.TestCase):
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
-            " CREATE ({var})-[{var3} {{`since`: ${since}}}]->({var2})"
+            " CREATE ({var})-[{var3}:`{rel_label}` {{`since`: ${since}}}]->({var2})"
             " SET {var}.`name` = ${val1}, {var2}.`name` = ${val2}"
             " RETURN {var}, {var2}, {var3}").format(var=start.query_variable,
                 var2=end.query_variable, var3=rel.query_variable, label=label,
                 id=get_dict_key(params, sid), id2=get_dict_key(params, eid),
                 val1=get_dict_key(params, n), val2=get_dict_key(params, n2),
-                since=get_dict_key(params, since))
+                since=get_dict_key(params, since), rel_label=rel.labels)
+
+        self.assertEqual(exp, query)
+        self.assertEqual(5, len(params))
+
+    def test_can_build_single_create_relationship_with_existing_nodes_create_query_with_ensure_unique(self):
+        sid = 99
+        n = 'mark {}'.format(random())
+        start = OpenNode(id=sid, properties={'name': n})
+        eid = 88
+        n2 = 'kram {}'.format(random())
+        end = OpenNode(id=eid, properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save(ensure_unique=True)
+        label = rel.type
+        exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
+            " MATCH ({var2}) WHERE id({var2}) = ${id2}"
+            " MERGE ({var})-[{var3}:`{rel_label}` {{`since`: ${since}}}]->({var2})"
+            " SET {var}.`name` = ${val1}, {var2}.`name` = ${val2}"
+            " RETURN {var}, {var2}, {var3}").format(var=start.query_variable,
+                var2=end.query_variable, var3=rel.query_variable, label=label,
+                id=get_dict_key(params, sid), id2=get_dict_key(params, eid),
+                val1=get_dict_key(params, n), val2=get_dict_key(params, n2),
+                since=get_dict_key(params, since), rel_label=rel.labels)
 
         self.assertEqual(exp, query)
         self.assertEqual(5, len(params))
@@ -231,14 +288,189 @@ class RelatedEntityQueryTests(unittest.TestCase):
         query, params = q.save()
         label = rel.type
 
-        exp = ("CREATE ({var} {{`name`: ${name}}})-[{rel} {{`since`: ${since}}}]->({var2} {{`name`: ${name2}}})"
+        exp = ("CREATE ({var}:`{start_label}` {{`name`: ${name}}})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`{end_label}` {{`name`: ${name2}}})"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
-                rel=rel.query_variable, label='Relationship',
+                rel=rel.query_variable, label=rel.labels,
                 since=get_dict_key(params, since), var2=end.query_variable,
-                name=get_dict_key(params, n), name2=get_dict_key(params, n2)))
+                name=get_dict_key(params, n), name2=get_dict_key(params, n2),
+                start_label=start.labels[0], end_label=end.labels[0]))
 
         self.assertEqual(exp, query)
         self.assertEqual(3, len(params))
+
+    # cases cover a mix of start and end with unique properties via a relationship.ensure_unique=Fase
+    def test_can_build_single_create_relationship_with_two_new_nodes_with_unique_properties_create_query(self):
+        n = 'mark {}'.format(random())
+        start = UniquePropertiesNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = UniquePropertiesNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save()
+        label = rel.type
+
+        exp = ("MERGE ({start_var}:`{start_label}` {{`name`: ${start_name}}})"
+            " ON CREATE SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " ON MATCH SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " MERGE ({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " ON CREATE SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " ON MATCH SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " CREATE ({start_var})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]->({end_var})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
+
+    def test_can_build_single_create_relationship_with_start_node_with_unique_properties_create_query(self):
+        n = 'mark {}'.format(random())
+        start = UniquePropertiesNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = OpenNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save()
+        label = rel.type
+
+        exp = ("MERGE ({start_var}:`{start_label}` {{`name`: ${start_name}}})"
+            " ON CREATE SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " ON MATCH SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " CREATE ({start_var})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]"
+            "->({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
+
+    def test_can_build_single_create_relationship_with_end_node_with_unique_properties_create_query(self):
+        n = 'mark {}'.format(random())
+        start = OpenNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = UniquePropertiesNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save()
+        label = rel.type
+
+        exp = ("MERGE ({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " ON CREATE SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " ON MATCH SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " CREATE ({start_var}:`{start_label}` {{`name`: ${start_name}}})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]"
+            "->({end_var})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
+
+    # cases cover a mix of start and end with unique properties via a relationship.ensure_unique=True
+    def test_can_build_single_create_relationship_with_two_new_nodes_with_unique_properties_create_query_with_ensure_unique_relationship(self):
+        n = 'mark {}'.format(random())
+        start = UniquePropertiesNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = UniquePropertiesNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save(ensure_unique=True)
+        label = rel.type
+
+        exp = ("MERGE ({start_var}:`{start_label}` {{`name`: ${start_name}}})"
+            " ON CREATE SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " ON MATCH SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " MERGE ({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " ON CREATE SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " ON MATCH SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " MERGE ({start_var})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]->({end_var})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
+
+    def test_can_build_single_create_relationship_with_start_node_with_unique_properties_create_query_with_ensure_unique_relationship(self):
+        n = 'mark {}'.format(random())
+        start = UniquePropertiesNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = OpenNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save(ensure_unique=True)
+        label = rel.type
+
+        exp = ("MERGE ({start_var}:`{start_label}` {{`name`: ${start_name}}})"
+            " ON CREATE SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " ON MATCH SET {start_var}.`location` = ${start_loc}, {start_var}.`name` = ${start_name}"
+            " MERGE ({start_var})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]"
+            "->({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
+
+    def test_can_build_single_create_relationship_with_end_node_with_unique_properties_create_query_with_ensure_unique_relationship(self):
+        n = 'mark {}'.format(random())
+        start = OpenNode(properties={'name': n})
+        n2 = 'kram {}'.format(random())
+        end = UniquePropertiesNode(properties={'name': n2})
+        since = 'yeserday'
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        q = Query(rel)
+        query, params = q.save(ensure_unique=True)
+        label = rel.type
+
+        exp = ("MERGE ({end_var}:`{end_label}` {{`name`: ${end_name}}})"
+            " ON CREATE SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " ON MATCH SET {end_var}.`location` = ${end_loc}, {end_var}.`name` = ${end_name}"
+            " MERGE ({start_var}:`{start_label}` {{`name`: ${start_name}}})-[{rel_var}:`{rel_label}` {{`since`: ${rel_since}}}]"
+            "->({end_var})"
+            " RETURN {start_var}, {end_var}, {rel_var}"
+            ).format(start_var=start.query_variable, start_label=start.labels[0],
+            start_name=get_dict_key(params, n), start_loc=get_dict_key(params, ''),
+            end_var=end.query_variable, end_label=end.labels[0],
+            end_name=get_dict_key(params, n2), end_loc=get_dict_key(params, ''),
+            rel_var=rel.query_variable, rel_since=get_dict_key(params, since),
+            rel_label=rel.labels)
+
+       
+        self.assertEqual(exp, query)
+        self.assertEqual(4, len(params))
 
     def test_can_build_single_create_relationship_with_one_existing_one_new_node_create_query(self):
         sid = 99
@@ -252,13 +484,14 @@ class RelatedEntityQueryTests(unittest.TestCase):
         query, params = q.save()
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
-            " CREATE ({var})-[{rel} {{`since`: ${since}}}]->({var2} {{`name`: ${name2}}})"
+            " CREATE ({var})-[{rel}:`{label}` {{`since`: ${since}}}]->({var2}:`{end_label}` {{`name`: ${name2}}})"
             " SET {var}.`name` = ${name}"
             " RETURN {var}, {var2}, {rel}".format(var=start.query_variable,
                 id=get_dict_key(params, sid),
-                rel=rel.query_variable, label='Relationship',
+                rel=rel.query_variable, label=rel.labels,
                 since=get_dict_key(params, since), var2=end.query_variable,
-                name=get_dict_key(params, n), name2=get_dict_key(params, n2)))
+                name=get_dict_key(params, n), name2=get_dict_key(params, n2),
+                end_label=end.labels[0]))
 
         self.assertEqual(exp, query)
         self.assertEqual(4, len(params))
@@ -272,15 +505,16 @@ class RelatedEntityQueryTests(unittest.TestCase):
         end = OpenNode(id=eid, properties={'name': n2})
         since = 'yeserday'
         label2 = 'knows_two'
-        rel = OpenRelationship(start=start, end=end, properties={'since': since})
         rel2 = OpenRelationship(start=start, end=end, labels=label2, properties={'since': since})
+        rel = OpenRelationship(start=start, end=end, properties={'since': since})
+        rel2.labels
         q = Query([rel, rel2])
         query, params = q.save()
 
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
-            " CREATE ({var})-[{var3} {{`since`: ${since}}}]->({var2}),"
+            " CREATE ({var})-[{var3}:`{rel_label}` {{`since`: ${since}}}]->({var2}),"
             " ({var})-[{var4}:`{label2}` {{`since`: ${since}}}]->({var2})"
             " SET {var}.`name` = ${val1}, {var2}.`name` = ${val2}"
             " RETURN {var}, {var2}, {var3}, {var4}").format(var=start.query_variable,
@@ -288,7 +522,7 @@ class RelatedEntityQueryTests(unittest.TestCase):
                 id=get_dict_key(params, sid), id2=get_dict_key(params, eid),
                 val1=get_dict_key(params, n), val2=get_dict_key(params, n2),
                 since=get_dict_key(params, since), var4=rel2.query_variable,
-                label2=label2)
+                label2=label2, rel_label=rel.labels)
 
         self.assertEqual(exp, query)
         self.assertEqual(5, len(params))
@@ -319,8 +553,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var3}) WHERE id({var3}) = ${id3}"
             " MATCH ({var4}) WHERE id({var4}) = ${id4}"
-            " CREATE ({var})-[{rel} {{`since`: ${since}}}]->({var2}),"
-            " ({var3})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
+            " CREATE ({var})-[{rel}:`{rel_label}` {{`since`: ${since}}}]->({var2}),"
+            " ({var3})-[{rel2}:`{rel2_label}` {{`since`: ${since2}}}]->({var4})"
             " SET {var}.`name` = ${name}, {var2}.`name` = ${name2}, {var3}.`name` = ${name3}, {var4}.`name` = ${name4}"
             " RETURN {var}, {var2}, {rel}, {var3}, {var4}, {rel2}").format(
                 var=start.query_variable, id=get_dict_key(params, sid),
@@ -331,7 +565,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
                 rel2=rel2.query_variable, since2=get_dict_key(params, since2),
                 label=label2, name=get_dict_key(params, name),
                 name2=get_dict_key(params, name2), name3=get_dict_key(params, name3),
-                name4=get_dict_key(params, name4))
+                name4=get_dict_key(params, name4), rel_label=rel.type,
+                rel2_label=rel2.type)
 
         self.assertEqual(exp, query)
         self.assertEqual(10, len(params))
@@ -356,11 +591,11 @@ class RelatedEntityQueryTests(unittest.TestCase):
         q = Query([rel, rel2])
         query, params = q.save()
 
-        label = rel.type
+        label = rel2.type
         exp = ("MATCH ({var2}) WHERE id({var2}) = ${id2}"
             " MATCH ({var4}) WHERE id({var4}) = ${id4}"
-            " CREATE ({var} {{`name`: ${name}}})-[{rel} {{`since`: ${since}}}]->({var2}),"
-            " ({var3} {{`name`: ${name3}}})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
+            " CREATE ({var}:`{start_label}` {{`name`: ${name}}})-[{rel}:`{rel_label}` {{`since`: ${since}}}]->({var2}),"
+            " ({var3}:`{start2_label}` {{`name`: ${name3}}})-[{rel2}:`{label}` {{`since`: ${since2}}}]->({var4})"
             " SET {var2}.`name` = ${name2}, {var4}.`name` = ${name4}"
             " RETURN {var}, {var2}, {rel}, {var3}, {var4}, {rel2}").format(
                 var=start.query_variable,
@@ -371,7 +606,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
                 rel2=rel2.query_variable, since2=get_dict_key(params, since2),
                 label=label2, name=get_dict_key(params, name),
                 name2=get_dict_key(params, name2), name3=get_dict_key(params, name3),
-                name4=get_dict_key(params, name4))
+                name4=get_dict_key(params, name4),
+                start_label=start.labels[0], rel_label=rel.type, start2_label=start2.labels[0])
 
         self.assertEqual(exp, query)
         self.assertEqual(8, len(params))
@@ -391,12 +627,12 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
         exp = ("MATCH ({start}) WHERE id({start}) = ${sid}"
             " MATCH ({end}) WHERE id({end}) = ${eid}"
-            " MATCH ({start})-[{rel}]->({end}) WHERE id({rel}) = ${rid}"
+            " MATCH ({start})-[{rel}:`{label}`]->({end}) WHERE id({rel}) = ${rid}"
             " SET {start}.`name` = ${name}, {end}.`name` = ${name2}, {rel}.`since` = ${since}"
             " RETURN {start}, {end}, {rel}".format(start=start.query_variable,
                 sid=get_dict_key(params, sid), end=end.query_variable,
                 eid=get_dict_key(params, eid), rel=rel.query_variable,
-                label='Relationship', name=get_dict_key(params, name),
+                label=rel.type, name=get_dict_key(params, name),
                 name2=get_dict_key(params, name2), rid=get_dict_key(params, rid),
                 since=get_dict_key(params, since)))
 
@@ -424,9 +660,9 @@ class RelatedEntityQueryTests(unittest.TestCase):
 
         exp = ("MATCH ({start}) WHERE id({start}) = ${sid}"
             " MATCH ({end}) WHERE id({end}) = ${eid}"
-            " MATCH ({start})-[{rel}]->({end}) WHERE id({rel}) = ${rid}"
+            " MATCH ({start})-[{rel}:`{rel_label}`]->({end}) WHERE id({rel}) = ${rid}"
             " MATCH ({start2}) WHERE id({start2}) = ${sid2}"
-            " CREATE ({start2})-[{rel2} {{`since`: ${since}}}]->({end2} {{`name`: ${name4}}})"
+            " CREATE ({start2})-[{rel2}:`{rel2_label}` {{`since`: ${since}}}]->({end2}:`{end2_label}` {{`name`: ${name4}}})"
             " SET {start}.`name` = ${name}, {end}.`name` = ${name2}, {rel}.`since` = ${since}, {start2}.`name` = ${name3}"
             " RETURN {start}, {end}, {rel}, {start2}, {end2}, {rel2}".format(start=start.query_variable,
                 sid=get_dict_key(params, sid), end=end.query_variable,
@@ -436,7 +672,8 @@ class RelatedEntityQueryTests(unittest.TestCase):
                 since=get_dict_key(params, since), rel2=rel2.query_variable,
                 name3=get_dict_key(params, name3), start2=start2.query_variable,
                 sid2=get_dict_key(params, sid2), end2=end2.query_variable,
-                name4=get_dict_key(params, name4)))
+                name4=get_dict_key(params, name4), rel_label=rel.type,
+                rel2_label=rel2.type, end2_label=end2.labels[0]))
 
         self.assertEqual(exp, query)
         self.assertEqual(9, len(params))

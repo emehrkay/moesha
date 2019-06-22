@@ -50,6 +50,6 @@ def _query_debug(query, params):
         if isinstance(v, str):
             v = "'{}'".format(v) if v else ''
 
-        fixed[k] = v
+        fixed[k] = v or "''"
 
     return temp.substitute(**fixed)

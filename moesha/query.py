@@ -46,6 +46,7 @@ class _BaseQuery(object):
     def __init__(self, params=None):
         self.params = params
         self.creates = []
+        self.before_matches = []
         self.matches = []
         self.merges = []
         self.on_create_sets = []
@@ -60,6 +61,7 @@ class _BaseQuery(object):
 
     def reset(self):
         self.creates = []
+        self.before_matches = []
         self.matches = []
         self.merges = []
         self.on_create_sets = []
@@ -147,6 +149,10 @@ class Query(_BaseQuery):
 
         pypher = self.pypher
 
+        if self.before_matches:
+            for bm in self.before_matches:
+                pypher.append(bm)
+
         if self.matches:
             for match in self.matches:
                 pypher.MATCH(match)
@@ -179,15 +185,15 @@ class Query(_BaseQuery):
         mapper = get_mapper(entity)
         has_unique = len(mapper.unique_properties()) > 0
         props = self._properties(entity, has_unique)
-        node = __.node(entity.query_variable,labels=entity.labels,
+        node = __.node(entity.query_variable, labels=entity.labels,
             **props)
 
         # if the entity has unique properties, we will build a MERGE statement
         # that looks like:
         #
         # MERGE (keanu:Person { name: 'Keanu Reeves' })
-        # ON CREATE SET keanu.created = timestamp()
-        # ON MATCH SET keanu.created = timestamp()
+        # ON CREATE SET keanu.created = timestamp(), kenau.name = 'name
+        # ON MATCH SET keanu.created = timestamp(), kenau.name = 'name
         # RETURN keanu 
         #
         # if it doesnt have unique properties, it will build a CREATE statement
@@ -199,7 +205,7 @@ class Query(_BaseQuery):
 
             self.merges.append(node)
 
-            for field, value in props.items():
+            for field, value in full_props.items():
                 stmt = getattr(__, entity.query_variable).property(field)._
                 stmt == value
 
@@ -227,8 +233,24 @@ class Query(_BaseQuery):
         return self
 
     def save_relationship(self, entity, ensure_unique=False):
-        """this method handles creating and saving relationships because there
-        are minor differences between the two"""
+        """this method handles creating and saving relationships.
+        It will hanle quite a few situations. 
+        Given the structure:
+
+        (start)-[rel]->[end]
+
+        We can have:
+        * A new start node
+        * An existing start node
+        * A new rel
+        * An existing rel
+        * A new end node
+        * An existing end node
+
+        Each start, rel, end could have uniqueness assigned to it
+        * start/end could have unique properties
+        * rel could have unique relationships
+        """
         start = entity.start
         start_properties = {}
         end = entity.end
@@ -280,7 +302,16 @@ class Query(_BaseQuery):
                 if len(start_query.creates):
                     rel.append(*start_query.creates)
                 elif len(start_query.merges):
-                    start_merge = Pypher().MERGE(*start_query.merges)
+                    has_matches = len(self.matches) > 0
+                    start_merge = Pypher()
+                    start_merge.MERGE(*start_query.merges)
+                    # import pudb; pu.db
+                    # if has_matches:
+                    #     start_merge.MERGE(*start_query.merges)
+                    # else:
+                    #     for ms in start_query.merges:
+                    #         start_merge = start_merge.append(ms)
+                    #     # start_merge.MATCH(*start_query.merges)
 
                     if start_query.on_create_sets:
                         start_merge.OnCreateSet(*start_query.on_create_sets)
@@ -288,8 +319,13 @@ class Query(_BaseQuery):
                     if start_query.on_match_sets:
                         start_merge.OnMatchSet(*start_query.on_match_sets)
 
-                    self.matches[-1].append(start_merge)
-                    rel.node(end.query_variable)
+                    self.before_matches.append(start_merge)
+                    # if has_matches:
+                    #     self.matches[-1].append(start_merge)
+                    # else:
+                    #     self.matches.insert(0, start_merge)
+
+                    rel.node(start.query_variable)
 
             rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out', **props)
@@ -297,8 +333,6 @@ class Query(_BaseQuery):
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                # rel.node(end.query_variable, labels=end.labels,
-                #     **end_properties)
                 end_query = Query(end, self.params)
                 end_query.build_save_pypher()
 
@@ -313,11 +347,15 @@ class Query(_BaseQuery):
                     if end_query.on_match_sets:
                         end_merge.OnMatchSet(*end_query.on_match_sets)
 
-                    self.matches[-1].append(end_merge)
+
+                    self.before_matches.append(end_merge)
+                    # if len(self.matches):
+                    #     self.matches[-1].append(end_merge)
+                    # else:
+                    #     self.matches.insert(0, end_merge)
+
                     rel.node(end.query_variable)
 
-
-            # self.merges.append(rel)
             if ensure_unique:
                 self.merges.append(rel)
             else:
@@ -345,8 +383,12 @@ class Query(_BaseQuery):
                     if start_query.on_match_sets:
                         start_merge.OnMatchSet(*start_query.on_match_sets)
 
-                    self.matches[-1].append(start_merge)
-                    rel.node(end.query_variable)
+                    if len(self.matches):
+                        self.matches[-1].append(start_merge)
+                    else:
+                        self.matches.append(start_merge)
+
+                    rel.node(start.query_variable)
 
             rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out')
@@ -370,7 +412,11 @@ class Query(_BaseQuery):
                     if end_query.on_match_sets:
                         end_merge.OnMatchSet(*end_query.on_match_sets)
 
-                    self.matches[-1].append(end_merge)
+                    if len(self.matches):
+                        self.matches[-1].append(end_merge)
+                    else:
+                        self.matches.append(end_merge)
+
                     rel.node(end.query_variable)
 
             rel.WHERE(__.ID(entity.query_variable) == _id)

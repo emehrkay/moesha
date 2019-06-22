@@ -1002,10 +1002,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        print('*'*80)
-        print(_query_debug(query, params))
-        print(params)
-        print('-'*80)
+        # print('*'*80)
+        # print(_query_debug(query, params))
+        # print(params)
+        # print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
