@@ -6,6 +6,8 @@ from moesha.entity import (Node, Relationship)
 from moesha.query import (Query, RelatedEntityQuery, QueryException,
     RelatedQueryException)
 from moesha.mapper import (Mapper, EntityMapper)
+from moesha.property import String
+from moesha.util import _query_debug
 
 
 def get_dict_key(dict, value):
@@ -34,13 +36,38 @@ class OpenRelationshipMapper(EntityMapper):
     __ALLOW_UNDEFINED_PROPERTIES__ = True
 
 
-class NodeQueryTests(unittest.TestCase):
+class UniquePropertiesNode(Node):
+    pass
 
+
+class UniquePropertiesNodeMapper(EntityMapper):
+    entity = UniquePropertiesNode
+    __PROPERTIES__ = {
+        'name': String(ensure_unique=True),
+        'location': String(),
+    }
+
+
+class NodeQueryTests(unittest.TestCase):
+    
     def test_can_build_single_node_create_query(self):
         name = 'mark {}'.format(random())
         n = OpenNode(properties={'name': name})
         q = Query(n)
         query, params = q.save()
+        exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
+            var=n.query_variable, val=get_dict_key(params, name))
+
+        self.assertEqual(exp, query)
+        self.assertEqual(1, len(params))
+
+    def test_can_build_single_node_with_unique_properties_create_query(self):
+        name = 'mark {}'.format(random())
+        n = UniquePropertiesNode(properties={'name': name})
+        q = Query(n)
+        query, params = q.save()
+        import pudb; pu.db
+        print(_query_debug(query, params))
         exp = 'CREATE ({var} {{`name`: ${val}}}) RETURN {var}'.format(
             var=n.query_variable, val=get_dict_key(params, name))
 

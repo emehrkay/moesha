@@ -497,10 +497,14 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return entity.data
 
-    def entity_data(self, entity_data=None, data_type='python'):
+    def entity_data(self, entity_data=None, data_type='python',
+                    unique_only=False):
         self.properties.data_type = data_type or self.data_type
 
-        return self.properties.data(entity_data)
+        return self.properties.data(entity_data, unique_only=unique_only)
+
+    def unique_properties(self):
+        return self.properties.unique_properties
 
     def create(self, id=None, entity=None, properties=None, labels=None,
                start=None, end=None, entity_type=NODE, data_type='python'):
@@ -998,10 +1002,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        # print('*'*80)
-        # print(_query_debug(query, params))
-        # print(params)
-        # print('-'*80)
+        print('*'*80)
+        print(_query_debug(query, params))
+        print(params)
+        print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
@@ -1025,6 +1029,11 @@ class Mapper(object):
         mapper = self.get_mapper(entity)
 
         return mapper.refresh(entity)
+
+    def unique_properties(self, entity):
+        mapper = self.get_mapper(entity)
+
+        return mapper.unique_properties()
 
 
 class Response(Collection):

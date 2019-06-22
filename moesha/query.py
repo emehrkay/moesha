@@ -44,27 +44,47 @@ VM = _ValueManager
 class _BaseQuery(object):
 
     def __init__(self, params=None):
+        self.params = params
         self.creates = []
         self.matches = []
         self.merges = []
+        self.on_create_sets = []
+        self.on_match_sets = []
         self.deletes = []
         self.matched_entities = []
         self.sets = []
         self.wheres = []
         self.orders = []
         self.returns = []
-        self.pypher = Pypher(params=params)
+        self.pypher = Pypher(params=self.params)
 
     def reset(self):
         self.creates = []
         self.matches = []
         self.merges = []
+        self.on_create_sets = []
+        self.on_match_sets = []
         self.deletes = []
         self.matched_entities = []
         self.sets = []
         self.wheres = []
         self.orders = []
         self.returns = []
+
+    def __iadd__(self, other):
+        self.creates += other.creates
+        self.matches += other.matches
+        self.merges += other.merges
+        self.on_create_sets += other.on_create_sets
+        self.on_match_sets += other.on_match_sets
+        self.deletes += other.deletes
+        self.matched_entities += other.matched_entities
+        self.sets += other.sets
+        self.wheres += other.wheres
+        self.orders += other.orders
+        self.returns += other.returns
+
+        return self
 
     def _node_by_id(self, entity):
         qv = entity.query_variable
@@ -114,7 +134,7 @@ class Query(_BaseQuery):
 
         self.entities = entities
 
-    def save(self, ensure_unique=False):
+    def build_save_pypher(self, ensure_unique=False):
         for entity in self.entities:
             if isinstance(entity, Node):
                 if entity.id:
@@ -137,18 +157,57 @@ class Query(_BaseQuery):
         if self.merges:
             pypher.MERGE(*self.merges)
 
+        if self.on_create_sets:
+            pypher.OnCreateSet(*self.on_create_sets)
+
+        if self.on_match_sets:
+            pypher.OnMatchSet(*self.on_match_sets)
+
         if self.sets:
             pypher.SET(*self.sets)
 
         pypher.RETURN(*self.returns)
 
+        return pypher
+
+    def save(self, ensure_unique=False):
+        pypher = self.build_save_pypher(ensure_unique=ensure_unique)
+
         return str(pypher), pypher.bound_params
 
     def create_node(self, entity):
-        props = self._properties(entity)
+        mapper = get_mapper(entity)
+        has_unique = len(mapper.unique_properties()) > 0
+        props = self._properties(entity, has_unique)
+        node = __.node(entity.query_variable,labels=entity.labels,
+            **props)
 
-        self.creates.append(__.node(entity.query_variable,
-            labels=entity.labels, **props))
+        # if the entity has unique properties, we will build a MERGE statement
+        # that looks like:
+        #
+        # MERGE (keanu:Person { name: 'Keanu Reeves' })
+        # ON CREATE SET keanu.created = timestamp()
+        # ON MATCH SET keanu.created = timestamp()
+        # RETURN keanu 
+        #
+        # if it doesnt have unique properties, it will build a CREATE statement
+        # that looks like:
+        # 
+        # CREATE (keanu:Person { name: 'Keanu Reeves' }) return keanu
+        if has_unique:
+            full_props = self._properties(entity)
+
+            self.merges.append(node)
+
+            for field, value in props.items():
+                stmt = getattr(__, entity.query_variable).property(field)._
+                stmt == value
+
+                self.on_create_sets.append(stmt)
+                self.on_match_sets.append(stmt)
+        else:
+            self.creates.append(node)
+
         self.returns.append(entity.query_variable)
 
         return self
@@ -215,8 +274,22 @@ class Query(_BaseQuery):
             if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
-                rel = rel.node(start.query_variable, labels=start.labels,
-                    **start_properties)
+                start_query = Query(start, self.params)
+                start_query.build_save_pypher()
+
+                if len(start_query.creates):
+                    rel.append(*start_query.creates)
+                elif len(start_query.merges):
+                    start_merge = Pypher().MERGE(*start_query.merges)
+
+                    if start_query.on_create_sets:
+                        start_merge.OnCreateSet(*start_query.on_create_sets)
+
+                    if start_query.on_match_sets:
+                        start_merge.OnMatchSet(*start_query.on_match_sets)
+
+                    self.matches[-1].append(start_merge)
+                    rel.node(end.query_variable)
 
             rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out', **props)
@@ -224,9 +297,27 @@ class Query(_BaseQuery):
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                rel.node(end.query_variable, labels=end.labels,
-                    **end_properties)
+                # rel.node(end.query_variable, labels=end.labels,
+                #     **end_properties)
+                end_query = Query(end, self.params)
+                end_query.build_save_pypher()
 
+                if len(end_query.creates):
+                    rel.append(*end_query.creates)
+                elif len(end_query.merges):
+                    end_merge = Pypher().MERGE(*end_query.merges)
+
+                    if end_query.on_create_sets:
+                        end_merge.OnCreateSet(*end_query.on_create_sets)
+
+                    if end_query.on_match_sets:
+                        end_merge.OnMatchSet(*end_query.on_match_sets)
+
+                    self.matches[-1].append(end_merge)
+                    rel.node(end.query_variable)
+
+
+            # self.merges.append(rel)
             if ensure_unique:
                 self.merges.append(rel)
             else:
@@ -238,8 +329,24 @@ class Query(_BaseQuery):
             if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
-                rel = rel.node(start.query_variable, labels=start.labels,
-                    **start_properties)
+                # rel = rel.node(start.query_variable, labels=start.labels,
+                #     **start_properties)
+                start_query = Query(start, self.params)
+                start_query.build_save_pypher()
+
+                if len(start_query.creates):
+                    rel.append(*start_query.creates)
+                elif len(start_query.merges):
+                    start_merge = Pypher().MERGE(*start_query.merges)
+
+                    if start_query.on_create_sets:
+                        start_merge.OnCreateSet(*start_query.on_create_sets)
+
+                    if start_query.on_match_sets:
+                        start_merge.OnMatchSet(*start_query.on_match_sets)
+
+                    self.matches[-1].append(start_merge)
+                    rel.node(end.query_variable)
 
             rel.rel(entity.query_variable, labels=entity.labels,
                 direction='out')
@@ -247,8 +354,24 @@ class Query(_BaseQuery):
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                rel.node(end.query_variable, labels=end.labels,
-                    **end_properties)
+                # rel.node(end.query_variable, labels=end.labels,
+                #     **end_properties)
+                end_query = Query(end, self.params)
+                end_query.build_save_pypher()
+
+                if len(end_query.creates):
+                    rel.append(*end_query.creates)
+                elif len(end_query.merges):
+                    end_merge = Pypher().MERGE(*end_query.merges)
+
+                    if end_query.on_create_sets:
+                        end_merge.OnCreateSet(*end_query.on_create_sets)
+
+                    if end_query.on_match_sets:
+                        end_merge.OnMatchSet(*end_query.on_match_sets)
+
+                    self.matches[-1].append(end_merge)
+                    rel.node(end.query_variable)
 
             rel.WHERE(__.ID(entity.query_variable) == _id)
             self._update_properties(entity)
@@ -307,10 +430,10 @@ class Query(_BaseQuery):
 
         return self
 
-    def _properties(self, entity):
+    def _properties(self, entity, unique_only=False):
         props = {}
         mapper = get_mapper(entity)
-        properties = mapper.entity_data(entity.data)
+        properties = mapper.entity_data(entity.data, unique_only=unique_only)
 
         for field, value in properties.items():
             name = VM.get_next(entity, field)

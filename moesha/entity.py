@@ -12,6 +12,7 @@ class Entity(object):
         self._data = {}
         self._initial = {}
         self._changes = {}
+        self._deleted = []
         self.labels = labels or []
 
         self.hydrate(properties=properties, reset=True)
@@ -29,6 +30,10 @@ class Entity(object):
     @property
     def changes(self):
         return self._changes
+
+    @property
+    def deleted(self):
+        return self._deleted
 
     def _get_labels(self):
         self._labels.sort()
@@ -59,6 +64,7 @@ class Entity(object):
         if reset:
             self._data = copy.copy(properties)
             self._initial = copy.copy(properties)
+            self._deleted = []
         else:
             for k, v in properties.items():
                 self[k] = v
@@ -84,6 +90,11 @@ class Entity(object):
         self._data[name] = value
 
         return self
+
+    def __delitem__(self, name):
+        if name in self._data:
+            del self._data[name]
+            self._deleted.append(name)
 
     def __eq__(self, entity):
         return (self.id == entity.id and self.labels == entity.labels and

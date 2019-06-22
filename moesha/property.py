@@ -47,12 +47,20 @@ class PropertyManager(object):
     properties = property(_get_properties, _set_properties)
 
     @property
+    def unique_properties(self):
+        """this will return a list of properties that have ensure_unique=True
+        """
+        props = {k:p for k, p in self.properties.items() if p.ensure_unique}
+
+        return OrderedDict(sorted(props.items()))
+
+    @property
     def default_data(self):
         data = {n: f.value for n, f in self.properties.items()}
 
         return OrderedDict(sorted(data.items()))
 
-    def data(self, properties=None):
+    def data(self, properties=None, unique_only=False):
         default = copy.copy(self.default_data)
         default.update(properties or {})
         data = {}
@@ -66,7 +74,17 @@ class PropertyManager(object):
 
         self.reset()
 
-        return data
+        if not unique_only:
+            return data
+
+        unique_data = {}
+        unique = self.unique_properties
+
+        for k, v in data.items():
+            if k in unique:
+                unique_data[k] = v
+
+        return unique_data
 
     def __getitem__(self, field):
         if not field in self.properties:
@@ -116,7 +134,8 @@ class Property(object):
     default = None
 
     def __init__(self, value=None, data_type='python', default=None,
-                 immutable=False, name=None, options=None):
+                 immutable=False, name=None, options=None,
+                 ensure_unique=False):
         self.immutable = False
         self.name = name
         self._value = value
@@ -126,6 +145,7 @@ class Property(object):
         self.default = default or self.default
         self.immutable = immutable
         self.options = options or []
+        self.ensure_unique = ensure_unique
 
     def reset(self):
         if self._original_value is not None:
@@ -363,6 +383,13 @@ class RelatedEntity(object):
     def __call__(self, return_relationship=False, limit=None, skip=None,
                  matches=None, wheres=None, orders=None, returns=None,
                  **kwargs):
+        return self.set_context(return_relationship=return_relationship,
+            limit=limit, skip=skip, matches=matches, wheres=wheres,
+            orders=orders, returns=returns, **kwargs)
+
+    def set_context(self, return_relationship=False, limit=None, skip=None,
+                    matches=None, wheres=None, orders=None, returns=None,
+                    **kwargs):
         from .mapper import _Unit, Work
 
         work = Work(mapper=self.mapper.mapper)
