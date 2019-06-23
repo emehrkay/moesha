@@ -1041,7 +1041,7 @@ class Response(Collection):
     def __init__(self, mapper, response=None):
         self.mapper = mapper
         self.response = response
-        self._data = response.data if response else []
+        self._data = response.result_data if response else []
         super(Response, self).__init__()
 
     def _get_data(self):

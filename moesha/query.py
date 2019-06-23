@@ -247,9 +247,18 @@ class Query(_BaseQuery):
         * A new end node
         * An existing end node
 
-        Each start, rel, end could have uniqueness assigned to it
+        Each start, rel, and end could have uniqueness assigned to it
         * start/end could have unique properties
         * rel could have unique relationships
+
+        A Chyper query should be generated that looks something like this,
+        depending on the settings for each of the nodes:
+
+        MERGE (n_0:Node {`key`: val})
+        ON CREATE SET n_0.key = val, n_0.key2 = val2
+        ON MATCH SET n_0.key = val, n_0.key2 = val2
+        CREATE (n_0)-[r_0:RelLabel, {`key`: someVal}]->(n_1:Node {`key`: val})
+        RETURN n_0, n_1, r_0
         """
         start = entity.start
         start_properties = {}
@@ -305,13 +314,6 @@ class Query(_BaseQuery):
                     has_matches = len(self.matches) > 0
                     start_merge = Pypher()
                     start_merge.MERGE(*start_query.merges)
-                    # import pudb; pu.db
-                    # if has_matches:
-                    #     start_merge.MERGE(*start_query.merges)
-                    # else:
-                    #     for ms in start_query.merges:
-                    #         start_merge = start_merge.append(ms)
-                    #     # start_merge.MATCH(*start_query.merges)
 
                     if start_query.on_create_sets:
                         start_merge.OnCreateSet(*start_query.on_create_sets)
@@ -320,11 +322,6 @@ class Query(_BaseQuery):
                         start_merge.OnMatchSet(*start_query.on_match_sets)
 
                     self.before_matches.append(start_merge)
-                    # if has_matches:
-                    #     self.matches[-1].append(start_merge)
-                    # else:
-                    #     self.matches.insert(0, start_merge)
-
                     rel.node(start.query_variable)
 
             rel.rel(entity.query_variable, labels=entity.labels,
@@ -347,13 +344,7 @@ class Query(_BaseQuery):
                     if end_query.on_match_sets:
                         end_merge.OnMatchSet(*end_query.on_match_sets)
 
-
                     self.before_matches.append(end_merge)
-                    # if len(self.matches):
-                    #     self.matches[-1].append(end_merge)
-                    # else:
-                    #     self.matches.insert(0, end_merge)
-
                     rel.node(end.query_variable)
 
             if ensure_unique:
@@ -367,8 +358,6 @@ class Query(_BaseQuery):
             if start.id is not None:
                 rel = rel.node(start.query_variable)
             else:
-                # rel = rel.node(start.query_variable, labels=start.labels,
-                #     **start_properties)
                 start_query = Query(start, self.params)
                 start_query.build_save_pypher()
 
@@ -396,8 +385,6 @@ class Query(_BaseQuery):
             if end.id is not None:
                 rel.node(end.query_variable)
             else:
-                # rel.node(end.query_variable, labels=end.labels,
-                #     **end_properties)
                 end_query = Query(end, self.params)
                 end_query.build_save_pypher()
 
