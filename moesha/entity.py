@@ -146,9 +146,21 @@ class Collection(object):
         self.entities = entities or []
         self.index = 0
 
+    def get_data(self, item):
+        if isinstance(item, (Node, Relationship, Collection)):
+            item = item.data
+
+        if isinstance(item, (list, set, tuple, frozenset)):
+            return [self.get_data(i) for i in item]
+
+        if isinstance(item, dict):
+            return {k: self.get_data(v) for k, v in item.items()}
+
+        return item
+
     @property
     def data(self):
-        return [e.data for e in self]
+        return [self.get_data(e) for e in self]
 
     def __getitem__(self, field):
         return [entity[field] for entity in self]

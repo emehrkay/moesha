@@ -1041,7 +1041,35 @@ class Response(Collection):
     def __init__(self, mapper, response=None):
         self.mapper = mapper
         self.response = response
-        self._data = response.result_data if response else []
+
+        # response.data and response.result_data serve different purposes,
+        # .data is a list of all results while .result_data represents logical
+        # coupling. This is illustrated by the query
+        #   `MATCH(n)-[r]-(e) return n, r, e`
+        # .data will have a list of modes and relationships at an index
+        # while .result_data will be a list of dicts, with the keys n, r, e
+        # This check is done to ensure that we are not nesting results in
+        # Entity.Entity sets when the response should be a list of entities
+        # i.e. without this check and using .reslult_data by default,
+        # the query `return 1` would produce a
+        # Node whose .data property would have an entry `1` whose value is a
+        # Node with the .data property `result` whose value is `1`
+        #   Node.data == {1: Node.data == {'result': 1}}
+        # The desired output would be a Node whose .data['result'] is `1`
+        # Node.data = {'result': 1}
+        data = []
+
+        if response:
+            result_data_len = len(response.result_data)
+            data_len = len(response.data)
+
+            if result_data_len == 1 and len(response.result_data[0]) == data_len:
+                data = response.data
+            else:
+                data = response.result_data
+
+        self._data = data
+
         super(Response, self).__init__()
 
     def _get_data(self):
@@ -1097,6 +1125,8 @@ class Response(Collection):
                 for f, v in data.items():
                     if isinstance(v, (types.Node, types.Relationship)):
                         v = self._get_entity(v)
+                    elif isinstance(v, (list, set, tuple)):
+                        v = [self._get_entity(iv) for iv in v]
 
                     properties[f] = v
             elif isinstance(data, (list, set, tuple)):
@@ -1104,6 +1134,8 @@ class Response(Collection):
 
                 for e in data:
                     if isinstance(e, (types.Node, types.Relationship)):
+                        e = self._get_entity(e)
+                    elif isinstance(e, (types.Node, types.Relationship)):
                         e = self._get_entity(e)
 
                     result.append(e)
