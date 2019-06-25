@@ -147,8 +147,12 @@ class Collection(object):
         self.index = 0
 
     def get_data(self, item):
+        from .mapper import get_mapper
+
+
         if isinstance(item, (Node, Relationship, Collection)):
-            item = item.data
+            mapper = get_mapper(item, None)
+            item = mapper.data(item)
 
         if isinstance(item, (list, set, tuple, frozenset)):
             return [self.get_data(i) for i in item]
