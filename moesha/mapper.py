@@ -1019,6 +1019,8 @@ class Mapper(object):
             raise MapperConstraintError(ce.message)
         except Exception as e:
             raise e
+        finally:
+            self.connection.cleanup()
 
     def builder(self, entity, query_variable=None):
         mapper = self.get_mapper(entity)

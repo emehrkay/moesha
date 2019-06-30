@@ -34,6 +34,11 @@ class Connection(object):
 
             return Response(query=query, params=params, result=result)
 
+    def cleanup():
+        if self.driver:
+            self.driver.close()
+            self._driver = None
+
 
 class Response(object):
 
