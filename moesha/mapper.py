@@ -1063,10 +1063,15 @@ class Response(Collection):
             result_data_len = len(response.result_data)
             data_len = len(response.data)
 
-            if result_data_len == 1 and len(response.result_data[0]) == data_len:
-                data = response.data
-            else:
-                data = response.result_data
+            if data_len:
+                if result_data_len == 1\
+                    and len(response.result_data[0]) == data_len:
+                    data = response.data
+                elif result_data_len == data_len\
+                    and len(response.result_data[0]) == 1:
+                    data = response.data
+                else:
+                    data = response.result_data
 
         self._data = data
 
