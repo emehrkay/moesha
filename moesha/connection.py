@@ -14,7 +14,8 @@ class Connection(object):
     @property
     def driver(self):
         if not self._driver:
-            self._driver = GraphDatabase.driver(self.uri, auth=self.auth)
+            self._driver = GraphDatabase.driver(self.uri, auth=self.auth,
+                max_connection_pool_size=-1)
 
         return self._driver
 
@@ -38,6 +39,38 @@ class Connection(object):
         if self.driver:
             self.driver.close()
             self._driver = None
+
+
+class ConnectionTransaction:
+
+    def __init__(self, connection):
+        self.connection = connection
+        self._transaction = None
+        self._session = None
+
+    @property
+    def session(self):
+        if not self._session:
+            self._session = self.connection.driver.session()
+
+        return self._session
+
+    @property
+    def transaction(self):
+        if not self._transaction:
+            self._transaction = self.session.begin_transaction()
+
+        return self._transaction
+
+    def query(self, query, params=None):
+        transaction = self.transaction
+        result = transaction.run(query, params)
+
+        return Response(query=query, params=params, result=result)
+
+    def cleanup(self):
+        self.transaction.commit()
+        self._transaction = None
 
 
 class Response(object):

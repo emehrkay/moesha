@@ -17,7 +17,7 @@ from neobolt.exceptions import ConstraintError
 from .entity import Node, Relationship, Collection
 from .property import PropertyManager, RelatedManager, RelatedEntity
 from .query import Builder, Query, Helpers
-from .util import normalize_labels, entity_name, entity_to_labels
+from .util import normalize_labels, entity_name, entity_to_labels, timeit
 
 
 LOG = logging.getLogger(__name__)
@@ -274,6 +274,9 @@ class Work(object):
         return self.add_unit(unit)
 
     def send(self):
+        from .connection import ConnectionTransaction
+
+
         response = Response(mapper=self.mapper)
 
         """each unit will be processed, its before events executed, then the
@@ -282,11 +285,14 @@ class Work(object):
         will have their before events run instantly and their after and final
         events appended to the unit's"""
         try:
+            transaction = ConnectionTransaction(self.mapper.connection)
+
             for unit in self.units:
                 unit.prepare()
                 unit.execute_before_events()
 
-                resp = self.mapper.query(query=unit.query, params=unit.params)
+                resp, _ = self.mapper.transaction(query=unit.query,
+                    params=unit.params, transaction=transaction)
 
                 unit.execute_after_events(response=resp)
                 unit.execute_final_events()
@@ -297,6 +303,8 @@ class Work(object):
         else:
             return response
         finally:
+            # TODO: rollback all units if exception is thrown
+            transaction.cleanup()
             self.reset()
 
     def describe(self):
@@ -992,6 +1000,7 @@ class Mapper(object):
 
         return mapper.get_by_ids(ids=ids, work=work)
 
+    @timeit
     def query(self, pypher=None, query=None, params=None):
         if pypher:
             if isinstance(pypher, Partial):
@@ -1003,7 +1012,7 @@ class Mapper(object):
 
         from .util import _query_debug
         # print('*'*80)
-        # print(_query_debug(query, params))
+        # print(_query_debug(query, params), ";")
         # print(params)
         # print('-'*80)
         LOG.debug(query, params)
@@ -1019,8 +1028,41 @@ class Mapper(object):
             raise MapperConstraintError(ce.message)
         except Exception as e:
             raise e
-        finally:
-            self.connection.cleanup()
+        # finally:
+        #     self.connection.cleanup()
+
+    @timeit
+    def transaction(self, pypher=None, query=None, params=None,
+                    transaction=None):
+        if not transaction:
+            transaction = self.connection.driver
+
+        if pypher:
+            if isinstance(pypher, Partial):
+                pypher.build()
+                pypher = pypher.pypher
+
+            query = str(pypher)
+            params = pypher.bound_params
+
+        from .util import _query_debug
+        # print('*'*80)
+        # print(_query_debug(query, params), ";")
+        # print(params)
+        # print('-'*80)
+        LOG.debug(query, params)
+        LOG.debug(_query_debug(query, params))
+
+        try:
+            params = params or {}
+            res = transaction.query(query=query, params=params)
+            response = Response(mapper=self, response=res)
+
+            return response, transaction
+        except ConstraintError as ce:
+            raise MapperConstraintError(ce.message)
+        except Exception as e:
+            raise e
 
     def builder(self, entity, query_variable=None):
         mapper = self.get_mapper(entity)
