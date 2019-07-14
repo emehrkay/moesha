@@ -466,7 +466,8 @@ class Query(_BaseQuery):
     def _properties(self, entity, unique_only=False):
         props = {}
         mapper = get_mapper(entity)
-        properties = mapper.entity_data(entity.data, unique_only=unique_only)
+        properties = mapper.entity_data(entity.data, unique_only=unique_only,
+            data_type='graph')
 
         for field, value in properties.items():
             name = VM.get_next(entity, field)

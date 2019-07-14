@@ -329,6 +329,46 @@ class BooleanTests(unittest.TestCase):
         self.assertFalse(f.value)
 
 
+class JsonPropertyTests(unittest.TestCase):
+    
+    def test_can_create_json_without_value_and_get_dict(self):
+        f = JsonProperty()
+
+        self.assertIsInstance(f.value, dict)
+
+    def test_can_create_json_without_value_and_get_empty_string_for_graph(self):
+        f = JsonProperty(data_type='graph')
+
+        self.assertIsInstance(f.value, str)
+        self.assertEquals(f.value, '""')
+
+    def test_can_get_json_from_simple_dict(self):
+        d = {'name': 'mark'}
+        f = JsonProperty(data_type='graph', value=d)
+
+        self.assertEquals(f.value, json.dumps(d))
+
+    def test_can_convert_json_to_dict(self):
+        d = {'name': 'mark'}
+        jd = json.dumps(d)
+        f = JsonProperty(value=jd)
+
+        self.assertIsInstance(f.value, dict)
+
+        for k,v in d.items():
+            self.assertEqual(f.value[k], v)
+
+    def test_can_convert_json_to_list(self):
+        l = ['mark', 'was', 'here']
+        jl = json.dumps(l)
+        f = JsonProperty(value=jl)
+
+        self.assertIsInstance(f.value, list)
+
+        for i, v in enumerate(l):
+            self.assertEqual(f.value[i], v)
+
+
 class PropertyManagerTests(unittest.TestCase):
 
     def test_can_create_a_field_manager_without_fields(self):

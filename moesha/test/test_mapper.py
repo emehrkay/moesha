@@ -20,6 +20,40 @@ class TestConnection(object):
 
         return res()
 
+    class driver:
+        @staticmethod
+        def session(*args, **kwargs):
+
+            class Transaction:
+                @staticmethod
+                def begin_transaction(*args, **kwargs):
+
+                    class Run:
+
+                        @staticmethod
+                        def run(*args, **kwargs):
+
+                            class Resp:
+
+                                @staticmethod
+                                def data(*args, **kwargs):
+                                    return []
+
+                            return Resp()
+
+                        @staticmethod
+                        def commit(*args, **kwargs):
+                            return
+
+                        @staticmethod
+                        def rollback(*args, **kwargs):
+                            return
+
+                    return Run()
+
+            return Transaction()
+
+
 TC = TestConnection()
 
 

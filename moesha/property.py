@@ -254,6 +254,21 @@ class Boolean(Property):
             return self.default
 
 
+class JsonProperty(String):
+
+    def to_python(self, value):
+        if not value:
+            value = ''
+
+        if isinstance(value, (bytes, bytearray, str)):
+            return json.loads(value or '{}')
+
+        return value
+
+    def to_graph(self, value):
+        return json.dumps(value or '')
+
+
 class DateTime(Float):
 
     def to_python(self, value):

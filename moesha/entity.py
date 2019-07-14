@@ -12,7 +12,7 @@ class Entity(object):
         self._data = {}
         self._initial = {}
         self._changes = {}
-        self._deleted = []
+        self._deleted = {}
 
         # call the method directly, seems to be an issue with properties
         # and subclasses
@@ -67,7 +67,7 @@ class Entity(object):
         if reset:
             self._data = copy.copy(properties)
             self._initial = copy.copy(properties)
-            self._deleted = []
+            self._deleted = {}
         else:
             for k, v in properties.items():
                 self[k] = v
@@ -96,8 +96,8 @@ class Entity(object):
 
     def __delitem__(self, name):
         if name in self._data:
+            self._deleted[name] = self._data[name]
             del self._data[name]
-            self._deleted.append(name)
 
     def __eq__(self, entity):
         return (self.id == entity.id and self.labels == entity.labels and
