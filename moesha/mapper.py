@@ -343,7 +343,7 @@ class _RootMapper(type):
         def get_props(source):
             props = source.get('__PROPERTIES__', {})
             rels = source.get('__RELATIONSHIPS__', {})
-
+         
             properties.update(props)
             relationships.update(rels)
 
@@ -425,7 +425,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
         self._relationship_updated_handlers = {}
         self._relationship_removed_handlers = {}
         create_after = [self._refresh_entity, self.on_after_create,]
-        update_after = [self.on_properties_changed, self.on_after_update,]
+        update_after = [self.on_properties_changed, self._refresh_entity, self.on_after_update,]
         delete_after = [self.on_after_delete,]
 
         # only add the relationship events if the entity for this mapper

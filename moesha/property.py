@@ -266,6 +266,9 @@ class JsonProperty(String):
         return value
 
     def to_graph(self, value):
+        if isinstance(value, (bytes, bytearray, str)):
+            return value
+
         return json.dumps(value or '')
 
 

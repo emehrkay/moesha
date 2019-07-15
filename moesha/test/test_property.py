@@ -368,6 +368,13 @@ class JsonPropertyTests(unittest.TestCase):
         for i, v in enumerate(l):
             self.assertEqual(f.value[i], v)
 
+    def test_will_not_double_encode_json_string(self):
+        d = {'name': 'mark'}
+        jd = json.dumps(d)
+        f = JsonProperty(value=jd, data_type='graph')
+
+        self.assertEquals(f.value, jd)
+
 
 class PropertyManagerTests(unittest.TestCase):
 

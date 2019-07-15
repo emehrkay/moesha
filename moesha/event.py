@@ -59,11 +59,23 @@ class EventSourceMapperMixin:
     __entity_type__: relationship
     __entity_id__: SavedEntity.id
     __relationship__: SavedEntity.labels
+
+    to use simply add this mixin with an EntityNodeMapper or EntityRelationshipMapper
+    and when calling save, pass in a source argument:
+
+    class PostMapper(EventSourceMapperMixin, EntityNodeMapper):
+        entity = Post
+        __PROPERTIES__ = {
+            'title': String(),
+            'description': String(),
+        }
+
+    any changes made the the __PROPERTIES__ will be recorded
     """
-    # __RELATIONSHIPS__ = {
-    #     'SourcedEvents': RelatedEntity(relationship_entity=SourcedEvent,
-    #         ensure_unique=True),
-    # }
+    __RELATIONSHIPS__ = {
+        'SourcedEvents': RelatedEntity(relationship_entity=MadeEventChange,
+            ensure_unique=True),
+    }
 
     def save(self, entity, source=None, ensure_unique=False, work=None,
              **kwargs):
@@ -91,13 +103,20 @@ class EventSourceMapperMixin:
                 properties['__relationship__'] = entity_to_labels(entity)
                 properties['__id__'] = entity.id
 
+            entities = []
             changes = self.mapper.create(entity=SourcedEventChanges,
                 properties=properties)
-            made_changes = self.mapper.create(entity=MadeEventChange,
-                start=source, end=changes)
-            changes_for_entity = self.mapper.create(
-                entity=ChangesForEntity, start=changes, end=entity)
-            work = self.mapper.save(changes, made_changes,
-                changes_for_entity, work=work)
+
+            entities.append(changes)
+
+            if not is_relationship:
+                made_changes = self.mapper.create(entity=MadeEventChange,
+                    start=source, end=changes)
+                changes_for_entity = self.mapper.create(
+                    entity=ChangesForEntity, start=changes, end=entity)
+                entities.append(made_changes)
+                entities.append(changes_for_entity)
+
+            work = self.mapper.save(*entities, work=work)
 
         return work
