@@ -55,7 +55,8 @@ class EventSourceMapperMixin:
     (:SourceEntity)-[:MadeEventChange]->(:SourcedEventChanges)-[:ChangesForEntity]->(:SavedEntity)
 
     If the SavedEntity is a relationship, all of the entity's information
-    will be saved in the SourceEventChanges node including:
+    will be saved in the SourceEventChanges node and a ChangesForEntity relationship
+    will not be created. Data added to the SourceEventChanges node:
     __entity_type__: relationship
     __entity_id__: SavedEntity.id
     __relationship__: SavedEntity.labels
