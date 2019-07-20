@@ -17,9 +17,20 @@ class PropertyManager(object):
         self.data_type = data_type
         self.allow_undefined = allow_undefined
 
-    def reset(self):
+    def reset(self, clear_undefined=False):
+        properties = {}
+
         for f, p in self.properties.items():
             p.reset()
+
+            if not clear_undefined:
+                properties[f] = p
+                continue
+
+            if p.undefined == False:
+                properties[f] = p
+
+        self._properties = properties
 
         return self
 
@@ -120,7 +131,8 @@ class PropertyManager(object):
             else:
                 obj = Property
 
-            prop = obj(value=value, data_type=self.data_type, name=field)
+            prop = obj(value=value, data_type=self.data_type, name=field,
+                undefined=True)
 
             if prop not in self.properties:
                 self.properties[field] = prop
@@ -135,7 +147,7 @@ class Property(object):
 
     def __init__(self, value=None, data_type='python', default=None,
                  immutable=False, name=None, options=None,
-                 ensure_unique=False):
+                 ensure_unique=False, undefined=False):
         self.immutable = False
         self.name = name
         self._value = value
@@ -146,6 +158,7 @@ class Property(object):
         self.immutable = immutable
         self.options = options or []
         self.ensure_unique = ensure_unique
+        self.undefined = undefined
 
     def reset(self):
         if self._original_value is not None:

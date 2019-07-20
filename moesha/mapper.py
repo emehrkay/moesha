@@ -462,6 +462,11 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         return self
 
+    @property
+    def has_undefined_fields(self):
+        return self.__ALLOW_UNDEFINED_PROPERTIES__ or \
+            self.__ALLOW_UNDEFINED_RELATIONSHIPS__
+
     def __contains__(self, relationship):
         return relationship in self.relationships
 
@@ -508,6 +513,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
     def entity_data(self, entity_data=None, data_type='python',
                     unique_only=False):
         self.properties.data_type = data_type or self.data_type
+        self.properties.reset(clear_undefined=self.has_undefined_fields)
 
         return self.properties.data(entity_data, unique_only=unique_only)
 
@@ -1011,10 +1017,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        # print('*'*80)
-        # print(_query_debug(query, params), ";")
-        # print(params)
-        # print('-'*80)
+        print('*'*80)
+        print(_query_debug(query, params), ";")
+        print(params)
+        print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
@@ -1046,10 +1052,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        # print('*'*80)
-        # print(_query_debug(query, params), ";")
-        # print(params)
-        # print('-'*80)
+        print('*'*80)
+        print(_query_debug(query, params), ";")
+        print(params)
+        print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
