@@ -1114,12 +1114,12 @@ class Response(Collection):
             data_len = len(response.data)
 
             if data_len:
-                if result_data_len == 1\
-                    and len(response.result_data[0]) == data_len:
-                    data = response.data
-                elif result_data_len == data_len\
+                if result_data_len == data_len\
                     and len(response.result_data[0]) == 1:
                     data = response.data
+                elif result_data_len == 1\
+                    and len(response.result_data[0]) == data_len:
+                    data = response.result_data
                 else:
                     data = response.result_data
 
