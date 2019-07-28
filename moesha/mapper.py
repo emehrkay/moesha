@@ -1006,7 +1006,7 @@ class Mapper(object):
 
         return mapper.get_by_ids(ids=ids, work=work)
 
-    @timeit
+    #@timeit
     def query(self, pypher=None, query=None, params=None):
         if pypher:
             if isinstance(pypher, Partial):
@@ -1017,10 +1017,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        print('*'*80)
-        print(_query_debug(query, params), ";")
-        print(params)
-        print('-'*80)
+        # print('*'*80)
+        # print(_query_debug(query, params), ";")
+        # print(params)
+        # print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
@@ -1037,7 +1037,7 @@ class Mapper(object):
         # finally:
         #     self.connection.cleanup()
 
-    @timeit
+    #@timeit
     def transaction(self, pypher=None, query=None, params=None,
                     transaction=None):
         if not transaction:
@@ -1052,10 +1052,10 @@ class Mapper(object):
             params = pypher.bound_params
 
         from .util import _query_debug
-        print('*'*80)
-        print(_query_debug(query, params), ";")
-        print(params)
-        print('-'*80)
+        # print('*'*80)
+        # print(_query_debug(query, params), ";")
+        # print(params)
+        # print('-'*80)
         LOG.debug(query, params)
         LOG.debug(_query_debug(query, params))
 
