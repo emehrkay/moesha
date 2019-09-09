@@ -510,7 +510,6 @@ class RelatedEntityQueryTests(unittest.TestCase):
         rel2.labels
         q = Query([rel, rel2])
         query, params = q.save()
-
         label = rel.type
         exp = ("MATCH ({var}) WHERE id({var}) = ${id}"
             " MATCH ({var2}) WHERE id({var2}) = ${id2}"

@@ -44,9 +44,24 @@ class Entity(object):
         return self._labels
 
     def _set_labels(self, labels):
+        self._labels = self.lbl(labels)
+
+        return self
+
+    labels = property(_get_labels, _set_labels)
+
+    @classmethod
+    def lbl(cls, labels=None):
+        """utility method used to get the labels for the entity"""
+
         if not labels:
-            if self.__class__.__name__ not in ['Node', 'Relationship']:
-                labels = entity_to_labels(self).split(':')
+            if isinstance(cls, type):
+                name = cls.__name__
+            else:
+                name = cls.__class__.__name__
+
+            if name not in ['Node', 'Relationship']:
+                labels = entity_to_labels(cls).split(':')
             else:
                 labels = []
 
@@ -55,11 +70,7 @@ class Entity(object):
 
         labels.sort()
 
-        self._labels = labels
-
-        return self
-
-    labels = property(_get_labels, _set_labels)
+        return labels
 
     def hydrate(self, properties=None, reset=False):
         properties = properties or {}
