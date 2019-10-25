@@ -345,7 +345,7 @@ class RelatedManager(object):
         return self._mapper
 
     def _set_mapper(self, mapper):
-        for _, rel in self.relationships.items():
+        for name, rel in self.relationships.items():
             rel.mapper = mapper
 
         return self
@@ -434,6 +434,9 @@ class RelatedEntity(object):
         return self._mapper
 
     def _set_mapper(self, mapper):
+        if not mapper or not mapper.mapper:
+            return self
+
         self._mapper = mapper
         relationship = mapper.mapper.create(entity=self.relationship_entity)
         self.relationship_query.relationship_entity = relationship

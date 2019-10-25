@@ -39,6 +39,9 @@ class Entity(object):
         return self._deleted
 
     def _get_labels(self):
+        if self._labels and not isinstance(self._labels, (list, set, tuple)):
+            self._labels = [self._labels]
+
         self._labels.sort()
 
         return self._labels
@@ -144,6 +147,12 @@ class Relationship(Entity):
     @property
     def type(self):
         return self.labels
+
+    @classmethod
+    def lbl(cls, labels=None):
+        labels = super().lbl(labels=labels)
+
+        return labels[0]
 
 
 class Collection(object):

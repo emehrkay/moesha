@@ -522,6 +522,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
     def create(self, id=None, entity=None, properties=None, labels=None,
                start=None, end=None, entity_type=NODE, data_type='python'):
+        if not id and properties and 'id' in properties:
+            id = properties['id']
+            del properties['id']
+
         properties = self.entity_data(properties or {}, data_type=data_type)
 
         if labels and not entity:
