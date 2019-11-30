@@ -1,6 +1,6 @@
 import copy
 
-from .util import entity_to_labels
+from .util import entity_to_labels, MOESHA_ENTITY_TYPE
 
 
 class Entity(object):
@@ -28,6 +28,11 @@ class Entity(object):
 
     @property
     def data(self):
+        if isinstance(self, Relationship):
+            self._data[MOESHA_ENTITY_TYPE] = 'relationship'
+        elif isinstance(self, Node):
+            self._data[MOESHA_ENTITY_TYPE] = 'node'
+
         return self._data
 
     @property

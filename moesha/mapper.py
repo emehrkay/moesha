@@ -17,7 +17,8 @@ from neobolt.exceptions import ConstraintError
 from .entity import Node, Relationship, Collection
 from .property import PropertyManager, RelatedManager, RelatedEntity
 from .query import Builder, Query, Helpers
-from .util import normalize_labels, entity_name, entity_to_labels, timeit
+from .util import (normalize_labels, entity_name, entity_to_labels, timeit,
+    MOESHA_ENTITY_TYPE)
 
 
 LOG = logging.getLogger(__name__)
@@ -1162,6 +1163,7 @@ class Response(Collection):
 
     def _get_entity(self, data):
         try:
+            mapper = self.mapper
             start = None
             end = None
             entity_type = NODE
@@ -1181,13 +1183,27 @@ class Response(Collection):
                 properties = data._properties
                 _id = data.id
             elif isinstance(data, dict):
-                for f, v in data.items():
-                    if isinstance(v, (types.Node, types.Relationship)):
-                        v = self._get_entity(v)
-                    elif isinstance(v, (list, set, tuple)):
-                        v = [self._get_entity(iv) for iv in v]
+                if MOESHA_ENTITY_TYPE in data:
+                    if data[MOESHA_ENTITY_TYPE] == 'relationship':
+                        entity_type = RELATIONSHIP
+                    
+                    _id = data.get('id')
+                    labels = data.get('labels', [])
+                    properties = data
+                else:
+                    # if the list of properies is a dict, force the mapper
+                    # to be a generic one
+                    mapper = Mapper()
 
-                    properties[f] = v
+                    for f, v in data.items():
+                        if isinstance(v, (types.Node, types.Relationship)):
+                            v = self._get_entity(v)
+                        elif isinstance(v, (list, set, tuple)):
+                            v = [self._get_entity(iv) for iv in v]
+                        elif isinstance(v, dict):
+                            v = self._get_entity(v)
+
+                        properties[f] = v
             elif isinstance(data, (list, set, tuple)):
                 result = []
 
@@ -1210,7 +1226,7 @@ class Response(Collection):
                 frozenset)):
                 labels = [labels,]
 
-            return self.mapper.create(id=_id, labels=labels,
+            return mapper.create(id=_id, labels=labels,
                 properties=properties, entity_type=entity_type,
                 start=start, end=end)
         except Exception as e:

@@ -5,6 +5,9 @@ import time
 __normal = re.compile('[\W_]+')
 
 
+MOESHA_ENTITY_TYPE = '___MOESHA_ENTITY_TYPE___'
+
+
 def normalize(string):
     return __normal.sub('', string.lower())
 
