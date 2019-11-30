@@ -5,7 +5,7 @@ import time
 __normal = re.compile('[\W_]+')
 
 
-MOESHA_ENTITY_TYPE = '___MOESHA_ENTITY_TYPE___'
+MOESHA_ENTITY_TYPE = '___MOE$H@_3NTITY_TYP3___'
 
 
 def normalize(string):
