@@ -88,6 +88,17 @@ class Entity(object):
 
         return self
 
+    def get(self, name, default=None):
+        """this works differently than the typical dict.get method. The default
+        argument will only be returned if it is not None. otherwise the field's
+        default value will be returned"""
+        value = self[name]
+
+        if default is not None and not value:
+            return default
+
+        return value
+
     def __getitem__(self, name):
         return self._data.get(name, None)
 
