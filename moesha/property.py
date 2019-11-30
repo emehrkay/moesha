@@ -369,7 +369,7 @@ class RelatedEntity(object):
 
     def __init__(self, relationship_entity=None, relationship_type=None,
                  direction='out', mapper=None, ensure_unique=False,
-                 relationship_name=None):
+                 relationship_name=None, start_entity=None, end_entity=None):
         from .entity import Relationship
 
         if not relationship_entity and not relationship_type:
@@ -395,9 +395,10 @@ class RelatedEntity(object):
         self._wheres = []
         self._orders = []
         self._returns = []
+        self._end_entity = end_entity
         self.relationship_query = RelatedEntityQuery(
             relationship_entity=None, direction=direction,
-            relationship_type=relationship_type)
+            relationship_type=relationship_type, end_entity=end_entity)
 
     def reset(self):
         self._skip = None

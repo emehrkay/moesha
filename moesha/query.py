@@ -523,10 +523,10 @@ class RelatedEntityQuery(_BaseQuery):
         self.limit = None
 
         if self.start_entity:
-            self.start_entity.query_variable = None
+            self.start_entity.query_variable = self.start_query_variable
 
         if self.end_entity:
-            self.end_entity.query_variable = None
+            self.end_entity.query_variable = self.end_query_variable
 
     def _get_relationship_entity(self):
         return self._relationship_entity
