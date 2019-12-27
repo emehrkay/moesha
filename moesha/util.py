@@ -56,7 +56,10 @@ def _query_debug(query, params):
 
         fixed[k] = v or "''"
 
-    return temp.substitute(**fixed)
+    try:
+        return temp.substitute(**fixed)
+    except Exception as e:
+        return '{} -- {}'.format(query, params)
 
 
 def timeit(method):
