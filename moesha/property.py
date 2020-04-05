@@ -3,6 +3,7 @@ import json
 
 from collections import OrderedDict
 from datetime import datetime
+from dateutil.parser import parse
 
 from .query import RelatedEntityQuery
 
@@ -288,6 +289,9 @@ class JsonProperty(String):
 class DateTime(Float):
 
     def to_python(self, value):
+        if isinstance(value, str):
+            value = parse(value)
+
         if isinstance(value, datetime):
             value = value.timestamp()
 
