@@ -114,11 +114,11 @@ class _Unit(object):
                  before_events=None, after_events=None, **kwargs):
         self.before_events = before_events or []
         self.after_events = after_events or []
-        self.final_events = event_map.get('final', [])
+        self.event_map = event_map or {}
+        self.final_events = self.event_map.get('final', [])
         self.entity = entity
         self.action = action
         self.mapper = mapper
-        self.event_map = event_map or {}
         self.event = event
         self.kwargs = kwargs
         self.query = None
@@ -591,7 +591,7 @@ class EntityMapper(with_metaclass(_RootMapper)):
             work = Work(mapper=self.mapper)
 
         unit = _Unit(entity=entity, action=self._delete_entity, mapper=self,
-            detach=detach, event_map=self._event_map)
+            detach=detach, event_map=self._event_map, event=self.DELETE)
 
         work.add_unit(unit)
 
