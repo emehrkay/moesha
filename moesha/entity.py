@@ -109,7 +109,7 @@ class Entity(object):
 
     def __setitem__(self, name, value):
         if name in self._initial:
-            if value != self._initial[name]:
+            if value != self._initial[name] and self.id:
                 self._changes[name] = {
                     'from': self._initial[name],
                     'to': value,

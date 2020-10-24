@@ -112,15 +112,15 @@ class _Unit(object):
 
     def __init__(self, entity, action, mapper, event_map=None, event=None,
                  before_events=None, after_events=None, **kwargs):
+        self.before_events = before_events or []
+        self.after_events = after_events or []
+        self.final_events = event_map.get('final', [])
         self.entity = entity
         self.action = action
         self.mapper = mapper
         self.event_map = event_map or {}
-        self._event = event
+        self.event = event
         self.kwargs = kwargs
-        self.before_events = before_events or []
-        self.after_events = after_events or []
-        self.final_events = self.event_map.get('final', [])
         self.query = None
         self.params = None
 
@@ -246,8 +246,8 @@ class Work(object):
                 break
 
         if index is not None:
-            self.units[i].mapper.reset()
-            del self.units[i]
+            self.units[index].mapper.reset()
+            del self.units[index]
 
         return self
 
@@ -285,12 +285,12 @@ class Work(object):
         If the unit's entity is a relationship, the start and end entities
         will have their before events run instantly and their after and final
         events appended to the unit's"""
-        try:
-            transaction = ConnectionTransaction(self.mapper.connection)
+        transaction = ConnectionTransaction(self.mapper.connection)
 
+        try:
             for unit in self.units:
-                unit.prepare()
                 unit.execute_before_events()
+                unit.prepare()
 
                 resp, _ = self.mapper.transaction(query=unit.query,
                     params=unit.params, transaction=transaction)
@@ -487,6 +487,26 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
     data_type = property(_get_data_type, _set_data_type)
 
+    def _get_allow_undefined_properties(self):
+        return self.__ALLOW_UNDEFINED_PROPERTIES__
+
+    def _set_allow_undefiend_properties(self, allow):
+        self.__ALLOW_UNDEFINED_PROPERTIES__ = allow
+        self.properties.allow_undefined = allow
+
+    allow_undefined_properties = property(_get_allow_undefined_properties,
+        _set_allow_undefiend_properties)
+
+    def _get_allow_undefined_relationships(self):
+        return self.__ALLOW_UNDEFINED_RELATIONSHIPS__
+
+    def _set_allow_undefiend_relationships(self, allow):
+        self.__ALLOW_UNDEFINED_RELATIONSHIPS__ = allow
+        self.relationships.allow_undefined = allow
+
+    allow_undefined_relationships = property(
+        _get_allow_undefined_relationships, _set_allow_undefiend_relationships)
+
     def _get_entity_context(self):
         return self._entity_context
 
@@ -558,9 +578,10 @@ class EntityMapper(with_metaclass(_RootMapper)):
 
         EQV.define(entity)
 
+        event = self.UPDATE if bool(entity.id) else self.CREATE
         unit = _Unit(entity=entity, action=self._save_entity, mapper=self,
             event_map=self._event_map, ensure_unique=ensure_unique,
-            **kwargs)
+            event=event, **kwargs)
         work.add_unit(unit)
 
         return work
