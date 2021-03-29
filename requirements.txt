@@ -2,7 +2,7 @@ neo4j==1.7.0b1
 neobolt==1.7.0b1
 neotime==1.0.0
 pudb==2018.1
-Pygments==2.2.0
+Pygments==2.7.4
 python_cypher
 pytz==2018.5
 six==1.11.0
