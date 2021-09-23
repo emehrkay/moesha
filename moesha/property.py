@@ -389,7 +389,7 @@ class RelatedEntity(object):
         self.direction = direction
         self.ensure_unique = ensure_unique
         self.relationship_name = relationship_name
-        self._start_entity = None
+        self._start_entity = start_entity
         self._original_query_variable = None
         self.results = None
         self._mapper = mapper
@@ -584,12 +584,19 @@ class RelatedEntity(object):
     def prepare(self, limit=None, skip=None, matches=None, wheres=None,
                 orders=None, returns=None, return_relationship=False,
                 **kwargs):
+
+        def listify(item):
+            if item and not isinstance(item, (list, set, tuple)):
+                item = [item,]
+
+            return item
+
         limit = limit or self._limit
         skip = skip or self._skip
-        matches = matches or self._matches
-        wheres = wheres or self._wheres
-        orders = orders or self._orders
-        returns = returns or self._returns
+        matches = listify(matches or self._matches)
+        wheres = listify(wheres or self._wheres)
+        orders = listify(orders or self._orders)
+        returns = listify(returns or self._returns)
         self.relationship_query.skip = skip
         self.relationship_query.limit = limit
         self.relationship_query.matches = self.relationship_query.matches \

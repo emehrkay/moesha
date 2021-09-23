@@ -26,6 +26,23 @@ class Entity(object):
         return ('<moesha.Entity.{}: {} at {}>').format(self.__class__.__name__,
             fields, id(self))
 
+    def pluck(self, *args):
+        return {a: self[a] for a in args}
+
+    def purge(self, *args):
+        data = self.data
+
+        for a in args:
+            try:
+                del(data[a])
+            except:
+                pass
+
+        return data
+
+    def key_val(self, key, val):
+        return {self[key]: self[val]}
+
     @property
     def data(self):
         if isinstance(self, Relationship):
@@ -33,6 +50,7 @@ class Entity(object):
         elif isinstance(self, Node):
             self._data[MOESHA_ENTITY_TYPE] = 'node'
 
+        self._data['id'] = self.id
         return self._data
 
     @property
@@ -105,6 +123,9 @@ class Entity(object):
         return value
 
     def __getitem__(self, name):
+        if name == 'id':
+            return self.id
+
         return self._data.get(name, None)
 
     def __setitem__(self, name, value):
@@ -196,6 +217,15 @@ class Collection(object):
             return {k: self.get_data(v) for k, v in item.items()}
 
         return item
+
+    def purge(self, *args):
+        return [e.purge(*args) for e in self]
+
+    def pluck(self, *args):
+        return [e.pluck(*args) for e in self]
+
+    def key_val(self, key, val):
+        return {e[key]: e[val] for e in self}
 
     @property
     def data(self):

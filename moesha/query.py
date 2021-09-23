@@ -139,7 +139,7 @@ class Query(_BaseQuery):
     def build_save_pypher(self, ensure_unique=False):
         for entity in self.entities:
             if isinstance(entity, Node):
-                if entity.id:
+                if entity.id is not None:
                     self.update_node(entity)
                 else:
                     self.create_node(entity)
@@ -416,7 +416,7 @@ class Query(_BaseQuery):
 
     def delete(self, detach=False):
         for entity in self.entities:
-            if not entity.id:
+            if entity.id is None:
                 continue
 
             if isinstance(entity, Node):
@@ -494,7 +494,7 @@ class Query(_BaseQuery):
 class RelatedEntityQuery(_BaseQuery):
 
     def __init__(self, direction='out', relationship_entity=None,
-                 relationship_type=None, relationship_prpoerties=None,
+                 relationship_type=None, relationship_properties=None,
                  start_entity=None, end_entity=None, params=None,
                  single_relationship=False, start_query_variable='start_node',
                  relationship_query_variable='relt',
@@ -511,7 +511,7 @@ class RelatedEntityQuery(_BaseQuery):
         self.start_entity = start_entity
         self._end_entity = None
         self.end_entity = end_entity
-        self.relationship_prpoerties = relationship_prpoerties or {}
+        self.relationship_properties = relationship_properties or {}
         self.params = params
         self.skip = None
         self.limit = 1 if single_relationship else None
@@ -524,9 +524,11 @@ class RelatedEntityQuery(_BaseQuery):
 
         if self.start_entity:
             self.start_entity.query_variable = self.start_query_variable
+            VM.set_query_var(self.start_entity)
 
         if self.end_entity:
             self.end_entity.query_variable = self.end_query_variable
+            VM.set_query_var(self.end_entity)
 
     def _get_relationship_entity(self):
         return self._relationship_entity
@@ -553,6 +555,7 @@ class RelatedEntityQuery(_BaseQuery):
 
         if entity:
             entity.query_variable = self.start_query_variable
+            VM.set_query_var(entity)
 
         self._start_entity = entity
 
@@ -567,6 +570,7 @@ class RelatedEntityQuery(_BaseQuery):
 
         if entity:
             entity.query_variable = self.end_query_variable
+            VM.set_query_var(entity)
 
         self._end_entity = entity
 
@@ -575,7 +579,7 @@ class RelatedEntityQuery(_BaseQuery):
     def _build_start(self):
         pypher = Pypher()
 
-        if self.start_entity.id:
+        if self.start_entity.id is not None:
             qv = self.start_entity.query_variable
             where = __.ID(qv) == self.start_entity.id
 
@@ -607,12 +611,13 @@ class RelatedEntityQuery(_BaseQuery):
         if self.relationship_entity:
             self.relationship_entity.query_variable =\
                 self.relationship_query_variable
+            VM.set_query_var(self.relationship_entity)
 
             pypher.relationship(
                 self.relationship_entity.query_variable,
                 direction=self.direction,
                 labels=self.relationship_entity.labels,
-                **self.relationship_prpoerties)
+                **self.relationship_properties)
         else:
             pypher.relationship(direction=self.direction,
                 labels=self.relationship_type)
@@ -668,9 +673,20 @@ class RelatedEntityQuery(_BaseQuery):
 
             raise RelatedQueryException(('The relationship {} does not '))
 
+        if self.start_entity == entity:
+            msg = ('the start entity {} cannot be the same as the'
+                ' end entity'.format(entity))
+            raise RelatedQueryException(msg)
+
+        start = self.start_entity
+        end = entity
+
+        if self.direction == 'in':
+            start, end = end, start
+
         kwargs = {
-            'start': self.start_entity,
-            'end': entity,
+            'start': start,
+            'end': end,
             'properties': properties,
         }
 
@@ -683,11 +699,11 @@ class RelatedEntityQuery(_BaseQuery):
 
     def delete(self, entity):
         if isinstance(entity, Relationship):
-            if entity.id:
+            if entity.id is not None:
                 query = Query(entity)
 
                 return query.delete()
-            elif entity.end and entity.end.id:
+            elif entity.end and hasattr(entity.end, 'id'):
                 self.matches.insert(0, self._build_end())
                 self.matches.insert(0, self._build_relationship())
                 self.matches.insert(0, self._build_start())
@@ -711,7 +727,7 @@ class RelatedEntityQuery(_BaseQuery):
         def _build_start():
             pypher = Pypher()
 
-            if self.start_entity.id:
+            if self.start_entity.id is not None:
                 qv = self.start_entity.query_variable
                 where = __.ID(qv) == self.start_entity.id
 
@@ -742,7 +758,7 @@ class RelatedEntityQuery(_BaseQuery):
         self.wheres.append(__.ID(self.end_query_variable).IN(*id_params))
         _id = __.ID(self.start_query_variable)
 
-        if self.start_entity.id:
+        if self.start_entity.id is not None:
             self.wheres.append(_id == self.start_entity.id)
         # else:
         #     wheres.append(_id)
