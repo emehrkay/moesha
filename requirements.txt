@@ -3,7 +3,7 @@ neobolt==1.7.0b1
 neotime==1.0.0
 prompt-toolkit==3.0.20
 pudb==2018.1
-Pygments==2.10.0
+Pygments==2.15.0
 python-cypher==0.18.1
 pytz==2018.5
 six==1.11.0
